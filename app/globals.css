@@ -76,15 +76,20 @@ button { color: inherit; }
 .canvas-crumb { display: flex; align-items: center; gap: 7px; margin: 0 auto; color: #8492a0; font-size: 10px; }
 .canvas-crumb b { color: #bbc3ca; }
 .canvas-crumb strong { color: #33485e; }
+.canvas-config { display: flex; align-items: center; gap: 4px; margin-right: 8px; color: #8794a1; font-size: 8px; }
+.canvas-config select, .canvas-config input { height: 28px; border: 1px solid #dfe6ec; border-radius: 6px; background: #fff; color: #526579; font-size: 8px; padding: 0 5px; }
+.canvas-config input { width: 58px; }
 .zoom-controls { display: flex; align-items: center; border: 1px solid #dfe6ec; border-radius: 7px; height: 28px; overflow: hidden; background: #fff; }
 .zoom-controls button { border: 0; background: transparent; width: 27px; height: 100%; color: #65778a; cursor: pointer; }
 .zoom-controls span { min-width: 43px; text-align: center; font-size: 9px; font-weight: 700; color: #586b7d; }
-.zoom-controls .fit-button { width: 34px; border-left: 1px solid #e2e7eb; font-size: 9px; }
+.zoom-controls .fit-button { width: 34px; border-left: 1px solid #e2e7eb; font-size: 8px; }
+.zoom-controls button:disabled { opacity: .35; cursor: not-allowed; }
 .canvas-viewport { flex: 1; min-height: 0; position: relative; overflow: hidden; cursor: grab; background-color: #f5f7f9; background-image: linear-gradient(#e3e8ed 1px, transparent 1px), linear-gradient(90deg, #e3e8ed 1px, transparent 1px), linear-gradient(#edf0f3 1px, transparent 1px), linear-gradient(90deg, #edf0f3 1px, transparent 1px); background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px; }
 .canvas-viewport:active { cursor: grabbing; }
 .canvas-viewport.is-connecting { cursor: crosshair; }
-.diagram-surface { position: absolute; left: 0; top: 0; width: 2400px; height: 1600px; transform-origin: 0 0; will-change: transform; }
-.connection-layer { position: absolute; inset: 0; width: 2400px; height: 1600px; overflow: visible; pointer-events: none; }
+.diagram-surface { position: absolute; left: 0; top: 0; min-width: 1px; min-height: 1px; transform-origin: 0 0; will-change: transform; }
+.diagram-surface.bounded { background: rgba(255,255,255,.72); box-shadow: 0 0 0 1px rgba(87,105,122,.18), 0 12px 36px rgba(34,54,74,.08); }
+.connection-layer { position: absolute; overflow: visible; pointer-events: none; }
 .edge { pointer-events: stroke; cursor: pointer; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 18; }
 .canvas-viewport.ctrl-modifier .edge-hit { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='%232f6df6' stroke='white' stroke-width='2'/%3E%3Cpath d='M14 8v12M8 14h12' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 14 14, cell; }

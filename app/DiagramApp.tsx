@@ -15,14 +15,15 @@ import { useEditorInteraction } from "./hooks/useEditorInteraction";
 import { useDiagramInteractions } from "./hooks/useDiagramInteractions";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
 import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap } from "./model/project";
-import { orthogonalRoutePoints } from "./model/routing";
-import type { Connection, DataFlowProcess as Process, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
+import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
+import { boundsFromNodes, boundsFromPoints, expandBounds, nodeBounds, unionBounds } from "./model/viewport";
+import type { Bounds, Connection, DataFlowProcess as Process, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
 import { downloadJson } from "./utils/download";
 
 export default function DiagramApp() {
   const { project, setProject, dispatch } = useProjectDocument();
   const { selection, setSelection, connecting, setConnecting, modifierKeys } = useEditorInteraction();
-  const { zoom, setZoom, pan, beginPan, handleWheel, fitDiagram, toCanvasPoint } = useCanvasViewport(project.nodes, () => setSelection(null));
+  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, handleWheel, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, canvas: project.canvas, onClearSelection: () => setSelection(null) });
   const [toast, setToast] = useState<string | null>(null);
   const [activeProcessId, setActiveProcessId] = useState<string | null>("proc-order");
   const [isAnimating, setIsAnimating] = useState(true);
@@ -34,7 +35,6 @@ export default function DiagramApp() {
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateKind, setNewTemplateKind] = useState<PrimitiveKind>("application");
   const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "" });
-  const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +49,25 @@ export default function DiagramApp() {
   const selectedProcess = selection?.type === "process" ? project.processes.find((process) => process.id === selection.id) : undefined;
   const activeProcess = project.processes.find((process) => process.id === activeProcessId);
   const activeRoute = useMemo(() => activeProcess ? calculateProcessRoute(project, activeProcess.checkpoints) : [], [project, activeProcess]);
+  const contentBounds = useMemo(() => expandBounds(boundsFromNodes(project.nodes), 400), [project.nodes]);
+  const renderBounds = useMemo<Bounds>(() => project.canvas.mode === "bounded"
+    ? { x: 0, y: 0, width: project.canvas.width, height: project.canvas.height }
+    : unionBounds(contentBounds, viewportBounds), [contentBounds, project.canvas, viewportBounds]);
+  const selectionBounds = useMemo<Bounds | null>(() => {
+    if (selection?.type === "node") {
+      const node = project.nodes.find((item) => item.id === selection.id);
+      return node ? nodeBounds(node) : null;
+    }
+    if (selection?.type === "connection") {
+      const connection = project.connections.find((item) => item.id === selection.id);
+      return connection ? boundsFromPoints(connectionRoute(project, connection)) : null;
+    }
+    if (selection?.type === "process") {
+      const process = project.processes.find((item) => item.id === selection.id);
+      return process ? boundsFromNodes(project.nodes.filter((node) => process.checkpoints.includes(node.id))) : null;
+    }
+    return null;
+  }, [project, selection]);
 
   useEffect(() => {
     if (!selectedNode || !selectedNode.capabilities.length || selectedNode.capabilities.includes(portDraft.capability)) return;
@@ -240,11 +259,20 @@ export default function DiagramApp() {
               <button className="tool" onClick={addProcess} aria-label="Add process">◎</button>
             </div>
             <div className="canvas-crumb"><span>Logical Diagram</span><b>/</b><strong>Primary View</strong></div>
+            <div className="canvas-config">
+              <select aria-label="Canvas mode" value={project.canvas.mode} onChange={(event) => dispatch({ type: "canvas.update", patch: { mode: event.target.value as "bounded" | "infinite" } })}>
+                <option value="bounded">Bounded</option>
+                <option value="infinite">Infinite</option>
+              </select>
+              {project.canvas.mode === "bounded" && <><input aria-label="Canvas width" type="number" min="640" step="100" value={project.canvas.width} onChange={(event) => dispatch({ type: "canvas.update", patch: { width: Math.max(1, Number(event.target.value)) } })} onBlur={() => dispatch({ type: "canvas.update", patch: { width: Math.max(640, project.canvas.width) } })} /><span>×</span><input aria-label="Canvas height" type="number" min="480" step="100" value={project.canvas.height} onChange={(event) => dispatch({ type: "canvas.update", patch: { height: Math.max(1, Number(event.target.value)) } })} onBlur={() => dispatch({ type: "canvas.update", patch: { height: Math.max(480, project.canvas.height) } })} /></>}
+            </div>
             <div className="zoom-controls">
-              <button onClick={() => setZoom((value) => Math.max(0.4, value - 0.1))}>−</button>
+              <button onClick={zoomOut} aria-label="Zoom out">−</button>
               <span>{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom((value) => Math.min(1.5, value + 0.1))}>＋</button>
-              <button className="fit-button" onClick={fitDiagram}>Fit</button>
+              <button onClick={zoomIn} aria-label="Zoom in">＋</button>
+              <button className="fit-button" onClick={fitDocument} title="Fit document">Doc</button>
+              <button className="fit-button" disabled={!selectionBounds} onClick={() => selectionBounds && fitBounds(selectionBounds)} title="Fit selection">Sel</button>
+              <button className="fit-button" onClick={resetView} title="Reset to 100%">1:1</button>
             </div>
           </div>
 
@@ -256,7 +284,7 @@ export default function DiagramApp() {
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleCanvasDrop}
           >
-            <div className="diagram-surface" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+            <div className={`diagram-surface ${project.canvas.mode}`} style={{ width: Math.max(project.canvas.width, renderBounds.x + renderBounds.width), height: Math.max(project.canvas.height, renderBounds.y + renderBounds.height), transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
               <ConnectionLayer
                 project={project}
                 selection={selection}
@@ -266,6 +294,8 @@ export default function DiagramApp() {
                 canvasRef={canvasRef}
                 pan={pan}
                 zoom={zoom}
+                renderBounds={renderBounds}
+                viewportBounds={viewportBounds}
                 onSelect={(connectionId) => setSelection({ type: "connection", id: connectionId })}
                 onAddBend={addBendPoint}
                 onBeginBendDrag={beginBendDrag}
@@ -276,7 +306,7 @@ export default function DiagramApp() {
                   showToast(`Bend point ${pointIndex + 1} removed.`);
                 }}
               />
-              <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} />
+              <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} />
             </div>
 
             <div className="minimap">
@@ -284,7 +314,7 @@ export default function DiagramApp() {
               {project.nodes.map((node) => <i key={node.id} style={{ left: `${Math.min(88, node.x / 18)}%`, top: `${Math.min(78, node.y / 12)}%`, background: node.color }} />)}
               <div className="minimap-window" />
             </div>
-            <div className="canvas-hint">Scroll to pan · ⌘ scroll to zoom · Snap {GRID}px</div>
+            <div className="canvas-hint">Scroll to pan · Ctrl+scroll to zoom at cursor · {project.canvas.mode === "infinite" ? "Infinite canvas" : `${project.canvas.width} × ${project.canvas.height}`} · Snap {GRID}px</div>
           </div>
 
           <div className={`process-tray ${processOpen ? "open" : ""}`}>

@@ -1,7 +1,8 @@
-import type { Port, Project, SystemNode } from "./types";
+import type { CanvasSettings, Port, Project, SystemNode } from "./types";
 
 export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
+export const DEFAULT_CANVAS: CanvasSettings = { mode: "bounded", width: 2400, height: 1600 };
 
 export const createId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
@@ -46,6 +47,7 @@ export function createDemoProject(): Project {
     name: "Cardiology PACS Connectivity",
     description: "Logical integration map for cardiology ordering, modality worklist, and image acquisition.",
     updatedAt: new Date().toISOString(),
+    canvas: { ...DEFAULT_CANVAS },
     nodes,
     connections: [
       { id: "c1", sourceNodeId: "emr-1", sourcePortId: "emr-orm-out", targetNodeId: "ie-1", targetPortId: "ie-orm-in", capability: "HL7", subtype: "ORM", dataType: "Cardiology order", description: "Outbound signed order" },
@@ -62,7 +64,7 @@ export function createDemoProject(): Project {
 }
 
 export function blankProject(name: string, description: string): Project {
-  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), nodes: [], connections: [], processes: [], customLibrary: [] };
+  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, nodes: [], connections: [], processes: [], customLibrary: [] };
 }
 
 export function calculateProcessRoute(project: Project, checkpoints: string[]): string[] {
@@ -114,6 +116,11 @@ export function migrateProjectDocument(value: unknown): Project | null {
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
     updatedAt: project.updatedAt ?? new Date().toISOString(),
+    canvas: {
+      mode: project.canvas?.mode === "infinite" ? "infinite" : "bounded",
+      width: Math.max(640, Number(project.canvas?.width) || DEFAULT_CANVAS.width),
+      height: Math.max(480, Number(project.canvas?.height) || DEFAULT_CANVAS.height),
+    },
     nodes: project.nodes,
     connections: project.connections,
     processes: project.processes,

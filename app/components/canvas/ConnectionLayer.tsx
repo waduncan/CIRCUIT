@@ -2,7 +2,8 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from
 import { capabilityConfig } from "../../model/catalog";
 import { connectionRoute, routeMidpoint, svgPath } from "../../model/routing";
 import { snap } from "../../model/project";
-import type { Connection, DataFlowProcess, Point, Project, Selection } from "../../model/types";
+import { boundsFromPoints, intersectsBounds } from "../../model/viewport";
+import type { Bounds, Connection, DataFlowProcess, Point, Project, Selection } from "../../model/types";
 
 type ConnectionLayerProps = {
   project: Project;
@@ -13,6 +14,8 @@ type ConnectionLayerProps = {
   canvasRef: RefObject<HTMLDivElement | null>;
   pan: Point;
   zoom: number;
+  renderBounds: Bounds;
+  viewportBounds: Bounds;
   onSelect: (connectionId: string) => void;
   onAddBend: (connection: Connection, point: Point) => void;
   onBeginBendDrag: (event: ReactPointerEvent<SVGCircleElement>, connection: Connection, pointIndex: number) => void;
@@ -29,6 +32,8 @@ export function ConnectionLayer({
   canvasRef,
   pan,
   zoom,
+  renderBounds,
+  viewportBounds,
   onSelect,
   onAddBend,
   onBeginBendDrag,
@@ -36,7 +41,7 @@ export function ConnectionLayer({
   onRemoveBend,
 }: ConnectionLayerProps) {
   return (
-    <svg className="connection-layer" viewBox="0 0 2400 1600" aria-label="System connections">
+    <svg className="connection-layer" style={{ left: renderBounds.x, top: renderBounds.y, width: renderBounds.width, height: renderBounds.height }} viewBox={`${renderBounds.x} ${renderBounds.y} ${renderBounds.width} ${renderBounds.height}`} aria-label="System connections">
       <defs>
         <filter id="edgeGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
       </defs>
@@ -44,6 +49,7 @@ export function ConnectionLayer({
         const active = activeRoute.includes(connection.id);
         const selected = selection?.type === "connection" && selection.id === connection.id;
         const routePoints = connectionRoute(project, connection);
+        if (!selected && !active && !intersectsBounds(boundsFromPoints(routePoints), viewportBounds)) return null;
         const path = svgPath(routePoints);
         const label = routeMidpoint(routePoints);
         const accent = activeProcess?.color ?? capabilityConfig[connection.capability].color;
