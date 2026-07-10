@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useCallback,
   useEffect,
@@ -417,7 +415,13 @@ export default function DiagramApp() {
       showToast(`Enable ${portDraft.capability} before adding this port.`);
       return;
     }
-    const port: Port = { id: id("port"), name: portDraft.name.trim() || `${portDraft.subtype} ${portDraft.direction === "inbound" ? "In" : "Out"}`, ...portDraft };
+    const port: Port = {
+      id: id("port"),
+      ...portDraft,
+      name:
+        portDraft.name.trim() ||
+        `${portDraft.subtype} ${portDraft.direction === "inbound" ? "In" : "Out"}`,
+    };
     updateNode(selectedNode.id, { ports: [...selectedNode.ports, port] });
     setPortDraft((current) => ({ ...current, name: "" }));
     showToast(`${port.capability} ${port.subtype} port added.`);

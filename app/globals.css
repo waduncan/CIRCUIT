@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --ink: #152333;
@@ -13,7 +15,7 @@
 
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
-body { margin: 0; background: #eef2f5; color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+body { margin: 0; background: #eef2f5; color: var(--ink); @apply font-sans antialiased; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 
