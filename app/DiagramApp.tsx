@@ -13,6 +13,11 @@ type Capability = "HL7" | "FHIR" | "DICOM" | "TCP" | "General Data";
 type Direction = "inbound" | "outbound";
 type PrimitiveKind = "emr" | "interface" | "application" | "database" | "device" | "cloud";
 
+type Point = {
+  x: number;
+  y: number;
+};
+
 type Port = {
   id: string;
   name: string;
@@ -45,6 +50,7 @@ type Connection = {
   subtype: string;
   dataType: string;
   description: string;
+  bendPoints?: Point[];
 };
 
 type Process = {
@@ -211,6 +217,61 @@ function connectionSubtype(source: Port, target: Port) {
   return source.subtype;
 }
 
+function compactPoints(points: Point[]): Point[] {
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
+    return !previous || previous.x !== point.x || previous.y !== point.y;
+  });
+}
+
+function orthogonalRoutePoints(source: Point, target: Point, bendPoints: Point[] = []): Point[] {
+  if (!bendPoints.length) {
+    const midpointX = snap((source.x + target.x) / 2);
+    return compactPoints([
+      source,
+      { x: midpointX, y: source.y },
+      { x: midpointX, y: target.y },
+      target,
+    ]);
+  }
+
+  const route = [source];
+  let current = source;
+  for (const bend of bendPoints) {
+    route.push({ x: bend.x, y: current.y }, bend);
+    current = bend;
+  }
+  route.push({ x: target.x, y: current.y }, target);
+  return compactPoints(route);
+}
+
+function svgPath(points: Point[]): string {
+  return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+}
+
+function routeMidpoint(points: Point[]): Point {
+  const segments = points.slice(1).map((point, index) => ({
+    start: points[index],
+    end: point,
+    length: Math.abs(point.x - points[index].x) + Math.abs(point.y - points[index].y),
+  }));
+  const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
+  let remaining = totalLength / 2;
+
+  for (const segment of segments) {
+    if (remaining <= segment.length) {
+      const ratio = segment.length ? remaining / segment.length : 0;
+      return {
+        x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+        y: segment.start.y + (segment.end.y - segment.start.y) * ratio,
+      };
+    }
+    remaining -= segment.length;
+  }
+
+  return points.at(-1) ?? { x: 0, y: 0 };
+}
+
 function downloadJson(data: unknown, fileName: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -229,6 +290,7 @@ export default function DiagramApp() {
   const [pan, setPan] = useState({ x: 20, y: 20 });
   const [connecting, setConnecting] = useState<{ nodeId: string; portId: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [modifierKeys, setModifierKeys] = useState({ ctrl: false, shift: false });
   const [activeProcessId, setActiveProcessId] = useState<string | null>("proc-order");
   const [isAnimating, setIsAnimating] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -264,6 +326,21 @@ export default function DiagramApp() {
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const updateModifiers = (event: KeyboardEvent) => {
+      setModifierKeys({ ctrl: event.ctrlKey, shift: event.shiftKey });
+    };
+    const clearModifiers = () => setModifierKeys({ ctrl: false, shift: false });
+    window.addEventListener("keydown", updateModifiers);
+    window.addEventListener("keyup", updateModifiers);
+    window.addEventListener("blur", clearModifiers);
+    return () => {
+      window.removeEventListener("keydown", updateModifiers);
+      window.removeEventListener("keyup", updateModifiers);
+      window.removeEventListener("blur", clearModifiers);
+    };
+  }, []);
 
   const allLibraryItems = useMemo(() => [...primitiveLibrary, ...project.customLibrary], [project.customLibrary]);
   const selectedNode = selection?.type === "node" ? project.nodes.find((node) => node.id === selection.id) : undefined;
@@ -302,12 +379,124 @@ export default function DiagramApp() {
     return { x: port.direction === "inbound" ? node.x : node.x + node.width, y: node.y + 82 + index * 34 };
   }, [project.nodes]);
 
-  const pathForConnection = useCallback((connection: Connection) => {
+  const routeForConnection = useCallback((connection: Connection) => {
     const source = portPosition(connection.sourceNodeId, connection.sourcePortId);
     const target = portPosition(connection.targetNodeId, connection.targetPortId);
-    const bend = Math.max(72, Math.abs(target.x - source.x) * 0.42);
-    return `M ${source.x} ${source.y} C ${source.x + bend} ${source.y}, ${target.x - bend} ${target.y}, ${target.x} ${target.y}`;
+    return orthogonalRoutePoints(source, target, connection.bendPoints);
   }, [portPosition]);
+
+  const saveRoute = useCallback((connection: Connection, routePoints: Point[]) => {
+    updateConnection(connection.id, { bendPoints: compactPoints(routePoints).slice(1, -1) });
+  }, [updateConnection]);
+
+  const addBendPoint = useCallback((connection: Connection, point: Point) => {
+    const source = portPosition(connection.sourceNodeId, connection.sourcePortId);
+    const target = portPosition(connection.targetNodeId, connection.targetPortId);
+    const route = orthogonalRoutePoints(source, target, connection.bendPoints);
+    let segmentIndex = 0;
+    let shortestDistance = Number.POSITIVE_INFINITY;
+    route.slice(1).forEach((end, index) => {
+      const start = route[index];
+      const distance = start.x === end.x
+        ? Math.abs(point.x - start.x) + Math.max(0, Math.min(start.y, end.y) - point.y, point.y - Math.max(start.y, end.y))
+        : Math.abs(point.y - start.y) + Math.max(0, Math.min(start.x, end.x) - point.x, point.x - Math.max(start.x, end.x));
+      if (distance < shortestDistance) {
+        shortestDistance = distance;
+        segmentIndex = index;
+      }
+    });
+    const nextRoute = [...route];
+    nextRoute.splice(segmentIndex + 1, 0, point);
+    saveRoute(connection, orthogonalRoutePoints(source, target, nextRoute.slice(1, -1)));
+  }, [portPosition, saveRoute]);
+
+  const beginBendDrag = (event: ReactPointerEvent<SVGCircleElement>, connection: Connection, pointIndex: number) => {
+    event.stopPropagation();
+    if (event.button === 2) return;
+    event.preventDefault();
+    setSelection({ type: "connection", id: connection.id });
+    const source = portPosition(connection.sourceNodeId, connection.sourcePortId);
+    const target = portPosition(connection.targetNodeId, connection.targetPortId);
+    const route = orthogonalRoutePoints(source, target, connection.bendPoints);
+    const bendPoints = route.slice(1, -1);
+    const point = bendPoints[pointIndex];
+    if (!point) return;
+    if (event.ctrlKey && event.shiftKey) {
+      bendPoints.splice(pointIndex, 1);
+      saveRoute(connection, orthogonalRoutePoints(source, target, bendPoints));
+      showToast(`Bend point ${pointIndex + 1} removed.`);
+      return;
+    }
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const move = (moveEvent: PointerEvent) => {
+      const movedBends = [...bendPoints];
+      const movedPoint = {
+        x: snap(point.x + (moveEvent.clientX - startX) / zoom),
+        y: snap(point.y + (moveEvent.clientY - startY) / zoom),
+      };
+      movedBends[pointIndex] = movedPoint;
+      saveRoute(connection, orthogonalRoutePoints(source, target, movedBends));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const beginSegmentDrag = (event: ReactPointerEvent<SVGLineElement>, connection: Connection, segmentIndex: number, route: Point[]) => {
+    if (event.ctrlKey || event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    setSelection({ type: "connection", id: connection.id });
+    const start = route[segmentIndex];
+    const end = route[segmentIndex + 1];
+    const horizontal = start.y === end.y;
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    const move = (moveEvent: PointerEvent) => {
+      const nextRoute = route.map((point) => ({ ...point }));
+      const delta = horizontal
+        ? snap((moveEvent.clientY - startClientY) / zoom)
+        : snap((moveEvent.clientX - startClientX) / zoom);
+      if (horizontal) {
+        const y = start.y + delta;
+        if (route.length === 2) {
+          nextRoute.splice(1, 0, { x: start.x, y }, { x: end.x, y });
+        } else if (segmentIndex === 0) {
+          nextRoute.splice(1, 1, { x: start.x, y }, { x: end.x, y });
+        } else if (segmentIndex === route.length - 2) {
+          nextRoute[segmentIndex].y = y;
+          nextRoute.splice(nextRoute.length - 1, 0, { x: end.x, y });
+        } else {
+          nextRoute[segmentIndex].y = y;
+          nextRoute[segmentIndex + 1].y = y;
+        }
+      } else {
+        const x = start.x + delta;
+        if (route.length === 2) {
+          nextRoute.splice(1, 0, { x, y: start.y }, { x, y: end.y });
+        } else if (segmentIndex === 0) {
+          nextRoute.splice(1, 1, { x, y: start.y }, { x, y: end.y });
+        } else if (segmentIndex === route.length - 2) {
+          nextRoute[segmentIndex].x = x;
+          nextRoute.splice(nextRoute.length - 1, 0, { x, y: end.y });
+        } else {
+          nextRoute[segmentIndex].x = x;
+          nextRoute[segmentIndex + 1].x = x;
+        }
+      }
+      saveRoute(connection, nextRoute);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   const handlePortClick = (node: SystemNode, port: Port) => {
     if (!connecting) {
@@ -547,7 +736,7 @@ export default function DiagramApp() {
           </div>
 
           <div
-            className={`canvas-viewport ${connecting ? "is-connecting" : ""}`}
+            className={`canvas-viewport ${connecting ? "is-connecting" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""}`}
             ref={canvasRef}
             onPointerDown={beginPan}
             onWheel={handleWheel}
@@ -562,20 +751,82 @@ export default function DiagramApp() {
                 {project.connections.map((connection) => {
                   const active = activeRoute.includes(connection.id);
                   const selected = selection?.type === "connection" && selection.id === connection.id;
-                  const path = pathForConnection(connection);
-                  const source = portPosition(connection.sourceNodeId, connection.sourcePortId);
-                  const target = portPosition(connection.targetNodeId, connection.targetPortId);
-                  const labelX = (source.x + target.x) / 2;
-                  const labelY = (source.y + target.y) / 2 - 14;
+                  const routePoints = routeForConnection(connection);
+                  const path = svgPath(routePoints);
+                  const label = routeMidpoint(routePoints);
                   const accent = activeProcess?.color ?? capabilityConfig[connection.capability].color;
                   return (
-                    <g key={connection.id} className={`edge ${active ? "active-route" : ""} ${selected ? "selected" : ""}`} onPointerDown={(event) => { event.stopPropagation(); setSelection({ type: "connection", id: connection.id }); }}>
-                      <path className="edge-hit" d={path} />
+                    <g
+                      key={connection.id}
+                      className={`edge ${active ? "active-route" : ""} ${selected ? "selected" : ""}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Select ${connection.capability} ${connection.subtype} connection`}
+                      onPointerDown={(event) => { event.stopPropagation(); setSelection({ type: "connection", id: connection.id }); }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelection({ type: "connection", id: connection.id });
+                        }
+                      }}
+                    >
+                      <path
+                        className="edge-hit"
+                        d={path}
+                        onClick={(event) => {
+                          if (!event.ctrlKey) return;
+                          event.stopPropagation();
+                          event.preventDefault();
+                          const rect = canvasRef.current?.getBoundingClientRect();
+                          if (!rect) return;
+                          addBendPoint(connection, {
+                            x: snap((event.clientX - rect.left - pan.x) / zoom),
+                            y: snap((event.clientY - rect.top - pan.y) / zoom),
+                          });
+                          setSelection({ type: "connection", id: connection.id });
+                        }}
+                      />
                       <path className="edge-line" d={path} style={{ "--edge-color": active ? accent : capabilityConfig[connection.capability].color } as React.CSSProperties} />
-                      <g className="edge-label" transform={`translate(${labelX} ${labelY})`}>
+                      {selected && routePoints.slice(1).map((point, segmentIndex) => {
+                        const start = routePoints[segmentIndex];
+                        return (
+                          <line
+                            key={`${connection.id}-segment-${segmentIndex}`}
+                            className={`edge-segment-hit ${start.y === point.y ? "horizontal" : "vertical"}`}
+                            x1={start.x}
+                            y1={start.y}
+                            x2={point.x}
+                            y2={point.y}
+                            onPointerDown={(event) => beginSegmentDrag(event, connection, segmentIndex, routePoints)}
+                          />
+                        );
+                      })}
+                      <g className="edge-label" transform={`translate(${label.x} ${label.y - 14})`}>
                         <rect x="-52" y="-12" width="104" height="24" rx="12" />
                         <text textAnchor="middle" dominantBaseline="middle">{connection.capability} · {connection.subtype}</text>
                       </g>
+                      {selected && routePoints.slice(1, -1).map((point, pointIndex) => (
+                        <circle
+                          key={`${connection.id}-bend-${pointIndex}`}
+                          className="bend-handle"
+                          cx={point.x}
+                          cy={point.y}
+                          r="7"
+                          role="button"
+                          aria-label={`Move bend point ${pointIndex + 1}`}
+                          onPointerDown={(event) => beginBendDrag(event, connection, pointIndex)}
+                          onContextMenu={(event) => {
+                            if (!event.ctrlKey) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const remaining = routePoints.slice(1, -1).filter((_, index) => index !== pointIndex);
+                            const source = routePoints[0];
+                            const target = routePoints.at(-1)!;
+                            saveRoute(connection, orthogonalRoutePoints(source, target, remaining));
+                            showToast(`Bend point ${pointIndex + 1} removed.`);
+                          }}
+                        />
+                      ))}
                       {active && isAnimating && (
                         <circle r="5" fill={accent} filter="url(#edgeGlow)">
                           <animateMotion dur="2.2s" repeatCount="indefinite" path={path} />
@@ -677,6 +928,25 @@ export default function DiagramApp() {
               <div className="selection-summary"><div className="large-object-icon connection-icon">↗</div><div><span>CONNECTION</span><strong>{selectedConnection.capability} · {selectedConnection.subtype}</strong><small>{selectedConnection.id}</small></div></div>
               <section className="property-section"><h3>Semantic definition</h3><div className="semantic-lock"><i style={{ background: capabilityConfig[selectedConnection.capability].color }} /><div><span>Protocol & subtype</span><strong>{selectedConnection.capability} / {selectedConnection.subtype}</strong></div><b>Locked by ports</b></div><label>Data being carried<input value={selectedConnection.dataType} onChange={(event) => updateConnection(selectedConnection.id, { dataType: event.target.value })} /></label><label>Operational description<textarea rows={4} value={selectedConnection.description} onChange={(event) => updateConnection(selectedConnection.id, { description: event.target.value })} /></label></section>
               <section className="property-section"><h3>Endpoints</h3><div className="endpoint"><span>FROM</span><strong>{project.nodes.find((node) => node.id === selectedConnection.sourceNodeId)?.name}</strong><small>{project.nodes.find((node) => node.id === selectedConnection.sourceNodeId)?.ports.find((port) => port.id === selectedConnection.sourcePortId)?.name}</small></div><div className="endpoint"><span>TO</span><strong>{project.nodes.find((node) => node.id === selectedConnection.targetNodeId)?.name}</strong><small>{project.nodes.find((node) => node.id === selectedConnection.targetNodeId)?.ports.find((port) => port.id === selectedConnection.targetPortId)?.name}</small></div></section>
+              <section className="property-section route-section">
+                <h3>Route points <span>{selectedConnection.bendPoints?.length ?? 0}</span></h3>
+                <p className="helper-copy">Every 90° corner has a handle, including automatic routes. Drag a handle to reshape the corner or drag between handles to move a whole segment. Ctrl+click adds a point; Ctrl+right-click removes one.</p>
+                {(selectedConnection.bendPoints ?? []).map((point, pointIndex) => (
+                  <div className="route-point" key={`${selectedConnection.id}-property-${pointIndex}`}>
+                    <b>{pointIndex + 1}</b>
+                    <span>X {point.x} · Y {point.y}</span>
+                    <button
+                      aria-label={`Remove bend point ${pointIndex + 1}`}
+                      onClick={() => updateConnection(selectedConnection.id, {
+                        bendPoints: selectedConnection.bendPoints?.filter((_, index) => index !== pointIndex),
+                      })}
+                    >×</button>
+                  </div>
+                ))}
+                <div className="route-actions">
+                  <button className="button ghost" disabled={!selectedConnection.bendPoints?.length} onClick={() => updateConnection(selectedConnection.id, { bendPoints: [] })}>Reset</button>
+                </div>
+              </section>
             </div>
           )}
 

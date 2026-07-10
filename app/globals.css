@@ -87,14 +87,24 @@ button { color: inherit; }
 .connection-layer { position: absolute; inset: 0; width: 2400px; height: 1600px; overflow: visible; pointer-events: none; }
 .edge { pointer-events: stroke; cursor: pointer; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 18; }
-.edge-line { fill: none; stroke: var(--edge-color); stroke-width: 2.4; opacity: .72; transition: .2s ease; }
+.canvas-viewport.ctrl-modifier .edge-hit { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='%232f6df6' stroke='white' stroke-width='2'/%3E%3Cpath d='M14 8v12M8 14h12' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 14 14, cell; }
+.edge-line { fill: none; stroke: var(--edge-color); stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: round; opacity: .72; transition: .2s ease; pointer-events: none; }
+.edge-segment-hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; }
+.edge-segment-hit.horizontal { cursor: ns-resize; }
+.edge-segment-hit.vertical { cursor: ew-resize; }
+.canvas-viewport.ctrl-modifier .edge-segment-hit { pointer-events: none; }
 .edge:hover .edge-line, .edge.selected .edge-line { stroke-width: 4; opacity: 1; }
 .edge.selected .edge-line { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--edge-color) 45%, transparent)); }
+.edge:focus { outline: none; }
+.edge:focus .edge-line { stroke-width: 4; opacity: 1; }
 .edge.active-route .edge-line { stroke-width: 4; opacity: 1; stroke-dasharray: 9 8; animation: flow-line .8s linear infinite; }
 @keyframes flow-line { to { stroke-dashoffset: -17; } }
 .edge-label { pointer-events: none; }
 .edge-label rect { fill: rgba(255,255,255,.96); stroke: #dce4ea; }
 .edge-label text { fill: #516578; font-size: 8.5px; font-weight: 700; }
+.bend-handle { fill: #2f6df6; stroke: #fff; stroke-width: 3; cursor: move; pointer-events: all; filter: drop-shadow(0 2px 3px rgba(30, 64, 175, .35)); }
+.bend-handle:hover { fill: #174bbd; r: 8px; }
+.canvas-viewport.ctrl-modifier .bend-handle { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='%23d64545' stroke='white' stroke-width='2'/%3E%3Cpath d='M8 14h12' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 14 14, not-allowed; }
 
 .system-node { position: absolute; background: #fff; border: 1px solid #ccd7e0; border-radius: 10px; box-shadow: 0 7px 20px rgba(34,54,74,.11); user-select: none; cursor: grab; transition: border-color .12s ease, box-shadow .12s ease; }
 .system-node:active { cursor: grabbing; }
@@ -201,6 +211,13 @@ button { color: inherit; }
 .endpoint strong { font-size: 9px; }
 .endpoint small { color: #83919e; margin-top: 3px; font-size: 7.5px; }
 .helper-copy { margin: -3px 0 10px; color: #7e8e9c; font-size: 8px; line-height: 1.45; }
+.route-point { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 5px 3px; border-bottom: 1px solid #edf1f4; }
+.route-point > b { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; background: #edf3ff; color: #2f6df6; font-size: 8px; }
+.route-point span { flex: 1; color: #66798c; font-size: 8px; font-variant-numeric: tabular-nums; }
+.route-point button { border: 0; background: transparent; color: #9aa7b2; cursor: pointer; }
+.route-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.route-actions .button { min-height: 32px; padding: 0 10px; }
+.button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
 .checkpoint { display: flex; align-items: center; gap: 8px; padding: 7px 3px; border-bottom: 1px solid #edf1f4; }
 .checkpoint > b { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #edf3ff; color: #2f6df6; font-size: 8px; }
 .checkpoint div { flex: 1; }
