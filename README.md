@@ -10,11 +10,23 @@ Drizzle support.
 
 ## Quick Start
 
-```bash
+The same commands work in Windows PowerShell, Command Prompt, macOS, and Linux:
+
+```powershell
 npm install
 npm run dev
+```
+
+Open the local URL printed by the development server. To create a production
+build, stop the development server with `Ctrl+C`, then run:
+
+```powershell
 npm run build
 ```
+
+On Windows, use a standard Node.js installation from
+[nodejs.org](https://nodejs.org/) and run these commands from the project
+folder. WSL, Bash, and Unix command-line tools are not required.
 
 This starter does not use `wrangler.jsonc`.
 
