@@ -64,7 +64,7 @@ export function diagramBounds(project: Project): Bounds {
 function renderContainer(container: DiagramContainer): string {
   return [
     `<rect x="${container.x}" y="${container.y}" width="${container.width}" height="${container.height}" rx="12" fill="${esc(container.color)}" fill-opacity="${container.opacity}" stroke="${esc(container.color)}" stroke-opacity="0.62" stroke-width="2"/>`,
-    `<text x="${container.x + 8}" y="${container.y - 12}" font-size="7" font-weight="800" letter-spacing="0.8" fill="${esc(container.color)}" fill-opacity="0.72">${esc(container.kind.toUpperCase())}</text>`,
+    `<text x="${container.x + 8}" y="${container.y - 12}" font-size="10" font-weight="800" letter-spacing="0.8" fill="${esc(container.color)}" fill-opacity="0.72">${esc(container.kind.toUpperCase())}</text>`,
     `<text x="${container.x + 68}" y="${container.y - 12}" font-size="12" font-weight="800" fill="${esc(container.color)}">${esc(container.name)}</text>`,
   ].join("");
 }
@@ -81,16 +81,16 @@ function renderNode(node: SystemNode): string {
   const textLeft = node.x + 59;
   const nameWidth = node.width - 59 - 16;
   parts.push(`<text x="${textLeft}" y="${node.y + 31}" font-size="12" font-weight="700" fill="#1f2d3a">${esc(truncate(node.name, nameWidth, 12))}</text>`);
-  parts.push(`<text x="${textLeft}" y="${node.y + 45}" font-size="8.5" fill="#8794a1">${esc(truncate(subtitle, nameWidth, 8.5))}</text>`);
+  parts.push(`<text x="${textLeft}" y="${node.y + 46}" font-size="10" fill="#8794a1">${esc(truncate(subtitle, nameWidth, 10))}</text>`);
   // Capability chips.
   let chipX = node.x + 12;
   const chipY = node.y + 60;
   for (const capability of node.capabilities) {
     const color = capabilityConfig[capability].color;
-    const chipW = capability.length * 4.4 + 12;
+    const chipW = capability.length * 6.2 + 12;
     if (chipX + chipW > node.x + node.width - 8) break;
-    parts.push(`<rect x="${chipX}" y="${chipY}" width="${chipW.toFixed(1)}" height="15" rx="7.5" fill="${esc(color)}" fill-opacity="0.10" stroke="${esc(color)}" stroke-opacity="0.22"/>`);
-    parts.push(`<text x="${(chipX + chipW / 2).toFixed(1)}" y="${chipY + 11}" font-size="7" font-weight="800" text-anchor="middle" fill="${esc(color)}">${esc(capability)}</text>`);
+    parts.push(`<rect x="${chipX}" y="${chipY}" width="${chipW.toFixed(1)}" height="18" rx="9" fill="${esc(color)}" fill-opacity="0.10" stroke="${esc(color)}" stroke-opacity="0.22"/>`);
+    parts.push(`<text x="${(chipX + chipW / 2).toFixed(1)}" y="${chipY + 13}" font-size="10" font-weight="800" text-anchor="middle" fill="${esc(color)}">${esc(capability)}</text>`);
     chipX += chipW + 4;
   }
   parts.push(`<line x1="${node.x + 12}" y1="${node.y + 80}" x2="${node.x + node.width - 12}" y2="${node.y + 80}" stroke="#edf1f4"/>`);
@@ -100,11 +100,11 @@ function renderNode(node: SystemNode): string {
     const pos = portPosition(project, node.id, port.id);
     const color = capabilityConfig[port.capability].color;
     const inbound = port.direction === "inbound";
-    const label = truncate(port.name, 78, 7.5);
-    const pillW = label.length * 4.65 + 10;
+    const label = truncate(port.name, 78, 10);
+    const pillW = label.length * 6.2 + 10;
     const pillX = inbound ? node.x + 8 : node.x + node.width - 8 - pillW;
-    parts.push(`<rect x="${pillX.toFixed(1)}" y="${(pos.y - 8).toFixed(1)}" width="${pillW.toFixed(1)}" height="16" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
-    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pos.y + 3).toFixed(1)}" font-size="7.5" fill="#66798c">${esc(label)}</text>`);
+    parts.push(`<rect x="${pillX.toFixed(1)}" y="${(pos.y - 10).toFixed(1)}" width="${pillW.toFixed(1)}" height="20" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
+    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pos.y + 4).toFixed(1)}" font-size="10" fill="#66798c">${esc(label)}</text>`);
     parts.push(`<circle cx="${pos.x}" cy="${pos.y}" r="6" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
   }
   return parts.join("");
@@ -122,7 +122,7 @@ function renderConnection(project: Project, connectionId: string): string {
     `<path d="${path}" fill="none" stroke="${esc(color)}" stroke-width="2.4" stroke-opacity="0.72" stroke-linecap="square" stroke-linejoin="round"/>`,
     `<g transform="translate(${mid.x.toFixed(1)} ${(mid.y - 14).toFixed(1)})">`,
     `<rect x="${(-halfW).toFixed(1)}" y="-12" width="${(halfW * 2).toFixed(1)}" height="24" rx="12" fill="#ffffff" fill-opacity="0.96" stroke="#dce4ea"/>`,
-    `<text x="0" y="0" font-size="8.5" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#516578">${esc(label)}</text>`,
+    `<text x="0" y="0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#516578">${esc(label)}</text>`,
     `</g>`,
   ].join("");
 }
@@ -139,7 +139,7 @@ function renderLegend(project: Project, x: number, y: number, width: number): st
   for (const capability of used) {
     const color = capabilityConfig[capability].color;
     parts.push(`<rect x="${itemX}" y="${itemY - 9}" width="12" height="12" rx="3" fill="${esc(color)}"/>`);
-    parts.push(`<text x="${itemX + 18}" y="${itemY + 1}" font-size="9" fill="#516578">${esc(capability)}</text>`);
+    parts.push(`<text x="${itemX + 18}" y="${itemY + 1}" font-size="10" fill="#516578">${esc(capability)}</text>`);
     itemX += Math.min(width, 60 + capability.length * 6);
   }
   return parts.join("");

@@ -130,7 +130,7 @@ export function printSvgDocument(svg: string, options: PrintOptions): void {
     .tile > svg { width: 100%; height: 100%; display: block; }
     .crop { width: 100%; height: 100%; box-sizing: border-box; border: 1px dashed #c8d2dc; overflow: hidden; }
     .crop > svg { width: 100%; height: 100%; display: block; }
-    .tile-label { position: absolute; right: 4px; bottom: 3px; font: 700 8px system-ui, sans-serif; color: #94a3b2; }
+    .tile-label { position: absolute; right: 4px; bottom: 3px; font: 700 10px system-ui, sans-serif; color: #94a3b2; }
   </style></head><body>${body}</body></html>`;
 
   const iframe = document.createElement("iframe");
