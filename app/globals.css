@@ -278,3 +278,18 @@ button { color: inherit; }
   .project-title-button { display: none; }
   .route-status { display: none; }
 }
+
+.export-modal { width: min(920px, 94vw); }
+.export-body { display: grid; grid-template-columns: 1fr 260px; gap: 18px; padding: 18px 22px 22px; overflow-y: auto; min-height: 0; }
+.export-preview { background: #f4f7fa; border: 1px solid #e3e9ee; border-radius: 10px; padding: 12px; max-height: 60vh; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+.export-preview svg { max-width: 100%; height: auto; }
+.export-controls { display: flex; flex-direction: column; gap: 12px; }
+.export-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 700; color: #516578; }
+.export-controls select, .export-controls input[type="number"] { font: inherit; font-size: 12px; font-weight: 500; padding: 7px 8px; border: 1px solid #d3dce4; border-radius: 7px; background: #fff; }
+.export-check { flex-direction: row !important; align-items: center; gap: 8px !important; }
+.export-check input { width: 15px; height: 15px; }
+.export-controls .field-row { display: flex; gap: 10px; }
+.export-controls .field-row label { flex: 1; }
+.export-warn { font-size: 10.5px; color: #b4530b; background: #fff5eb; border: 1px solid #f3d6b5; border-radius: 7px; padding: 7px 9px; margin: 0; font-weight: 600; }
+.export-hint { font-size: 10.5px; color: #8794a1; margin: 0; }
+@media (max-width: 720px) { .export-body { grid-template-columns: 1fr; } }

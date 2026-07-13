@@ -1,0 +1,166 @@
+import { capabilityConfig, icons, primitiveLibrary } from "./catalog";
+import { connectionRoute, portPosition, routeMidpoint, svgPath } from "./routing";
+import type { Capability, Project, SystemNode } from "./types";
+
+// Pure, dependency-free renderer that serialises a Project into a standalone SVG document.
+// Text is emitted as real <text> (stays sharp and selectable, never rasterised) and geometry
+// mirrors the on-canvas editor so exports match what the user sees. Used for SVG download and,
+// via the browser print path, for print-quality PDF.
+
+export type ExportBackground = "white" | "transparent";
+
+export type ExportSvgOptions = {
+  background?: ExportBackground;
+  padding?: number;
+  includeTitle?: boolean;
+  includeLegend?: boolean;
+};
+
+const FONT_STACK = "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const TITLE_BAND = 64;
+const LEGEND_ROW = 22;
+
+function esc(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Rough monospace-ish width estimate so long labels can be trimmed to fit their box.
+function truncate(text: string, maxWidth: number, fontSize: number): string {
+  const charWidth = fontSize * 0.62;
+  const maxChars = Math.max(1, Math.floor(maxWidth / charWidth));
+  return text.length <= maxChars ? text : `${text.slice(0, Math.max(1, maxChars - 1))}…`;
+}
+
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+function includePoint(bounds: Bounds, x: number, y: number): void {
+  bounds.minX = Math.min(bounds.minX, x);
+  bounds.minY = Math.min(bounds.minY, y);
+  bounds.maxX = Math.max(bounds.maxX, x);
+  bounds.maxY = Math.max(bounds.maxY, y);
+}
+
+export function diagramBounds(project: Project): Bounds {
+  const bounds: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const node of project.nodes) {
+    includePoint(bounds, node.x, node.y);
+    includePoint(bounds, node.x + node.width, node.y + node.height);
+  }
+  for (const connection of project.connections) {
+    const route = connectionRoute(project, connection);
+    for (const point of route) includePoint(bounds, point.x, point.y);
+    const mid = routeMidpoint(route);
+    includePoint(bounds, mid.x - 54, mid.y - 28);
+    includePoint(bounds, mid.x + 54, mid.y + 4);
+  }
+  if (!Number.isFinite(bounds.minX)) return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
+  return bounds;
+}
+
+function renderNode(node: SystemNode): string {
+  const subtitle = primitiveLibrary.find((item) => item.kind === node.kind)?.name ?? "System";
+  const parts: string[] = [];
+  // Card + accent topline.
+  parts.push(`<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="10" fill="#ffffff" stroke="#ccd7e0"/>`);
+  parts.push(`<rect x="${node.x + 10}" y="${node.y}" width="${node.width - 20}" height="4" rx="1.5" fill="${esc(node.color)}"/>`);
+  // Header: icon tile, name, subtitle.
+  parts.push(`<rect x="${node.x + 12}" y="${node.y + 12}" width="38" height="38" rx="9" fill="${esc(node.color)}" fill-opacity="0.10" stroke="${esc(node.color)}" stroke-opacity="0.25"/>`);
+  parts.push(`<text x="${node.x + 31}" y="${node.y + 37}" font-size="17" text-anchor="middle" fill="${esc(node.color)}">${esc(icons[node.kind])}</text>`);
+  const textLeft = node.x + 59;
+  const nameWidth = node.width - 59 - 16;
+  parts.push(`<text x="${textLeft}" y="${node.y + 31}" font-size="12" font-weight="700" fill="#1f2d3a">${esc(truncate(node.name, nameWidth, 12))}</text>`);
+  parts.push(`<text x="${textLeft}" y="${node.y + 45}" font-size="8.5" fill="#8794a1">${esc(truncate(subtitle, nameWidth, 8.5))}</text>`);
+  // Capability chips.
+  let chipX = node.x + 12;
+  const chipY = node.y + 60;
+  for (const capability of node.capabilities) {
+    const color = capabilityConfig[capability].color;
+    const chipW = capability.length * 4.4 + 12;
+    if (chipX + chipW > node.x + node.width - 8) break;
+    parts.push(`<rect x="${chipX}" y="${chipY}" width="${chipW.toFixed(1)}" height="15" rx="7.5" fill="${esc(color)}" fill-opacity="0.10" stroke="${esc(color)}" stroke-opacity="0.22"/>`);
+    parts.push(`<text x="${(chipX + chipW / 2).toFixed(1)}" y="${chipY + 11}" font-size="7" font-weight="800" text-anchor="middle" fill="${esc(color)}">${esc(capability)}</text>`);
+    chipX += chipW + 4;
+  }
+  parts.push(`<line x1="${node.x + 12}" y1="${node.y + 80}" x2="${node.x + node.width - 12}" y2="${node.y + 80}" stroke="#edf1f4"/>`);
+  // Ports: dot on the node edge, label pill just inside.
+  const project = { nodes: [node] };
+  for (const port of node.ports) {
+    const pos = portPosition(project, node.id, port.id);
+    const color = capabilityConfig[port.capability].color;
+    const inbound = port.direction === "inbound";
+    const label = truncate(port.name, 78, 7.5);
+    const pillW = label.length * 4.65 + 10;
+    const pillX = inbound ? node.x + 8 : node.x + node.width - 8 - pillW;
+    parts.push(`<rect x="${pillX.toFixed(1)}" y="${(pos.y - 8).toFixed(1)}" width="${pillW.toFixed(1)}" height="16" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
+    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pos.y + 3).toFixed(1)}" font-size="7.5" fill="#66798c">${esc(label)}</text>`);
+    parts.push(`<circle cx="${pos.x}" cy="${pos.y}" r="6" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
+  }
+  return parts.join("");
+}
+
+function renderConnection(project: Project, connectionId: string): string {
+  const connection = project.connections.find((item) => item.id === connectionId)!;
+  const route = connectionRoute(project, connection);
+  const path = svgPath(route);
+  const color = capabilityConfig[connection.capability].color;
+  const mid = routeMidpoint(route);
+  const label = `${connection.capability} · ${connection.subtype}`;
+  const halfW = Math.max(52, label.length * 3.4 + 12);
+  return [
+    `<path d="${path}" fill="none" stroke="${esc(color)}" stroke-width="2.4" stroke-opacity="0.72" stroke-linecap="square" stroke-linejoin="round"/>`,
+    `<g transform="translate(${mid.x.toFixed(1)} ${(mid.y - 14).toFixed(1)})">`,
+    `<rect x="${(-halfW).toFixed(1)}" y="-12" width="${(halfW * 2).toFixed(1)}" height="24" rx="12" fill="#ffffff" fill-opacity="0.96" stroke="#dce4ea"/>`,
+    `<text x="0" y="0" font-size="8.5" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#516578">${esc(label)}</text>`,
+    `</g>`,
+  ].join("");
+}
+
+function renderLegend(project: Project, x: number, y: number, width: number): string {
+  const used: Capability[] = (Object.keys(capabilityConfig) as Capability[]).filter((capability) =>
+    project.connections.some((connection) => connection.capability === capability) ||
+    project.nodes.some((node) => node.capabilities.includes(capability)),
+  );
+  if (!used.length) return "";
+  const parts: string[] = [`<text x="${x}" y="${y}" font-size="10" font-weight="800" fill="#516578">LEGEND</text>`];
+  let itemX = x;
+  const itemY = y + LEGEND_ROW;
+  for (const capability of used) {
+    const color = capabilityConfig[capability].color;
+    parts.push(`<rect x="${itemX}" y="${itemY - 9}" width="12" height="12" rx="3" fill="${esc(color)}"/>`);
+    parts.push(`<text x="${itemX + 18}" y="${itemY + 1}" font-size="9" fill="#516578">${esc(capability)}</text>`);
+    itemX += Math.min(width, 60 + capability.length * 6);
+  }
+  return parts.join("");
+}
+
+export function exportDiagramSvg(project: Project, options: ExportSvgOptions = {}): string {
+  const { background = "white", padding = 48, includeTitle = true, includeLegend = true } = options;
+  const bounds = diagramBounds(project);
+  const titleBand = includeTitle ? TITLE_BAND : 0;
+  const legendBand = includeLegend ? LEGEND_ROW * 2 : 0;
+  const contentW = bounds.maxX - bounds.minX;
+  const contentH = bounds.maxY - bounds.minY;
+  const totalW = Math.round(contentW + padding * 2);
+  const totalH = Math.round(contentH + padding * 2 + titleBand + legendBand);
+  const offsetX = padding - bounds.minX;
+  const offsetY = padding + titleBand - bounds.minY;
+
+  const layers: string[] = [];
+  if (background === "white") layers.push(`<rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#ffffff"/>`);
+  if (includeTitle) {
+    layers.push(`<text x="${padding}" y="${padding - 8}" font-size="20" font-weight="800" fill="#1f2d3a">${esc(project.name)}</text>`);
+    const subtitle = `${project.nodes.length} systems · ${project.connections.length} connections`;
+    layers.push(`<text x="${padding}" y="${padding + 14}" font-size="10" fill="#8794a1">${esc(subtitle)}</text>`);
+  }
+  layers.push(`<g transform="translate(${offsetX} ${offsetY})">`);
+  for (const connection of project.connections) layers.push(renderConnection(project, connection.id));
+  for (const node of project.nodes) layers.push(renderNode(node));
+  layers.push(`</g>`);
+  if (includeLegend) layers.push(renderLegend(project, padding, totalH - padding - LEGEND_ROW, totalW - padding * 2));
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" font-family="${FONT_STACK}">`,
+    layers.join("\n"),
+    `</svg>`,
+  ].join("\n");
+}
