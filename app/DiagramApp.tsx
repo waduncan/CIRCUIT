@@ -6,6 +6,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import { ExportDialog } from "./components/ExportDialog";
 import { PropertiesInspector } from "./components/PropertiesInspector";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer";
@@ -28,6 +29,7 @@ export default function DiagramApp() {
   const [isAnimating, setIsAnimating] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [processOpen, setProcessOpen] = useState(true);
   const [newProjectName, setNewProjectName] = useState("New healthcare integration");
   const [newProjectDescription, setNewProjectDescription] = useState("");
@@ -204,7 +206,7 @@ export default function DiagramApp() {
         <div className="topbar-actions">
           <button className="button ghost" onClick={() => fileInputRef.current?.click()}>Open JSON</button>
           <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importProject(event.target.files[0])} />
-          <button className="button ghost" onClick={() => downloadJson(project, `${project.name.toLowerCase().replaceAll(" ", "-")}.json`)}>Export</button>
+          <button className="button ghost" onClick={() => setExportOpen(true)}>Export</button>
           <button className="button primary" onClick={() => showToast("All changes are saved in this browser.")}><span className="status-dot" /> Saved</button>
         </div>
       </header>
@@ -343,6 +345,7 @@ export default function DiagramApp() {
           <div className="modal project-modal"><div className="modal-header"><div><span className="eyebrow">Project workflow</span><h2>Create or open a project</h2><p>Projects are saved locally and can be moved as JSON files.</p></div><button onClick={() => setNewProjectOpen(false)}>×</button></div><div className="project-modal-body"><div className="new-project-form"><label>Project name<input value={newProjectName} onChange={(event) => setNewProjectName(event.target.value)} /></label><label>Project description<textarea rows={4} placeholder="What systems and workflows will this diagram describe?" value={newProjectDescription} onChange={(event) => setNewProjectDescription(event.target.value)} /></label><button className="button primary full" onClick={() => { setProject(blankProject(newProjectName.trim() || "Untitled project", newProjectDescription)); setSelection(null); setActiveProcessId(null); setNewProjectOpen(false); }}>Create empty project</button></div><div className="project-options"><button onClick={() => { setProject(createDemoProject()); setSelection({ type: "node", id: "app-1" }); setActiveProcessId("proc-order"); setNewProjectOpen(false); }}><span>✦</span><div><strong>Load PACS example</strong><small>Explore a complete order and image workflow.</small></div></button><button onClick={() => fileInputRef.current?.click()}><span>↥</span><div><strong>Open JSON project</strong><small>Continue work from an exported file.</small></div></button><div className="workflow-steps">{["Describe project", "Choose objects", "Build diagram", "Connect ports", "Animate processes"].map((step, index) => <div key={step}><b>{index + 1}</b><span>{step}</span></div>)}</div></div></div></div>
         </div>
       )}
+      {exportOpen && <ExportDialog project={project} onClose={() => setExportOpen(false)} onToast={showToast} />}
     </main>
   );
 }
