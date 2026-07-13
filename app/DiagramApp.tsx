@@ -20,7 +20,7 @@ import type { Connection, DataFlowProcess as Process, LibraryItem, Port, PortDra
 import { downloadJson } from "./utils/download";
 
 export default function DiagramApp() {
-  const { project, setProject, dispatch } = useProjectDocument();
+  const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
   const { selection, setSelection, connecting, setConnecting, modifierKeys } = useEditorInteraction();
   const { zoom, setZoom, pan, beginPan, handleWheel, fitDiagram, toCanvasPoint } = useCanvasViewport(project.nodes, () => setSelection(null));
   const [toast, setToast] = useState<string | null>(null);
@@ -56,16 +56,16 @@ export default function DiagramApp() {
     setPortDraft((current) => ({ ...current, capability, subtype: capabilityConfig[capability].subtypes[0] }));
   }, [selectedNode, portDraft.capability]);
 
-  const updateNode = useCallback((nodeId: string, patch: Partial<SystemNode>) => {
-    dispatch({ type: "node.update", id: nodeId, patch });
+  const updateNode = useCallback((nodeId: string, patch: Partial<SystemNode>, coalesceKey?: string) => {
+    dispatch({ type: "node.update", id: nodeId, patch }, coalesceKey);
   }, [dispatch]);
 
-  const updateConnection = useCallback((connectionId: string, patch: Partial<Connection>) => {
-    dispatch({ type: "connection.update", id: connectionId, patch });
+  const updateConnection = useCallback((connectionId: string, patch: Partial<Connection>, coalesceKey?: string) => {
+    dispatch({ type: "connection.update", id: connectionId, patch }, coalesceKey);
   }, [dispatch]);
 
-  const updateProcess = useCallback((processId: string, patch: Partial<Process>) => {
-    dispatch({ type: "process.update", id: processId, patch });
+  const updateProcess = useCallback((processId: string, patch: Partial<Process>, coalesceKey?: string) => {
+    dispatch({ type: "process.update", id: processId, patch }, coalesceKey);
   }, [dispatch]);
 
   const showToast = (message: string) => setToast(message);
@@ -238,6 +238,9 @@ export default function DiagramApp() {
               <span className="tool-separator" />
               <button className={`tool ${connecting ? "active-connect" : ""}`} onClick={() => { setConnecting(null); showToast("Click an outbound port, then a compatible inbound port."); }} aria-label="Connect tool">↗</button>
               <button className="tool" onClick={addProcess} aria-label="Add process">◎</button>
+              <span className="tool-separator" />
+              <button className="tool" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">↺</button>
+              <button className="tool" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">↻</button>
             </div>
             <div className="canvas-crumb"><span>Logical Diagram</span><b>/</b><strong>Primary View</strong></div>
             <div className="zoom-controls">

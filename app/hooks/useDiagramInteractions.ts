@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
-import { snap } from "../model/project";
+import { createId, snap } from "../model/project";
 import { compactPoints, orthogonalRoutePoints, portPosition } from "../model/routing";
 import type { Connection, Point, Project, Selection, SystemNode } from "../model/types";
 
@@ -7,16 +7,16 @@ type DiagramInteractionOptions = {
   project: Project;
   zoom: number;
   setSelection: Dispatch<SetStateAction<Selection>>;
-  updateNode: (id: string, patch: Partial<SystemNode>) => void;
-  updateConnection: (id: string, patch: Partial<Connection>) => void;
+  updateNode: (id: string, patch: Partial<SystemNode>, coalesceKey?: string) => void;
+  updateConnection: (id: string, patch: Partial<Connection>, coalesceKey?: string) => void;
   showToast: (message: string) => void;
 };
 
 export function useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, showToast }: DiagramInteractionOptions) {
   const getPortPosition = useCallback((nodeId: string, portId: string) => portPosition(project, nodeId, portId), [project.nodes]);
 
-  const saveRoute = useCallback((connection: Connection, routePoints: Point[]) => {
-    updateConnection(connection.id, { bendPoints: compactPoints(routePoints).slice(1, -1) });
+  const saveRoute = useCallback((connection: Connection, routePoints: Point[], coalesceKey?: string) => {
+    updateConnection(connection.id, { bendPoints: compactPoints(routePoints).slice(1, -1) }, coalesceKey);
   }, [updateConnection]);
 
   const addBendPoint = useCallback((connection: Connection, point: Point) => {
@@ -58,13 +58,14 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     }
     const startX = event.clientX;
     const startY = event.clientY;
+    const gestureKey = createId("bend-drag");
     const move = (moveEvent: PointerEvent) => {
       const movedBends = [...bendPoints];
       movedBends[pointIndex] = {
         x: snap(point.x + (moveEvent.clientX - startX) / zoom),
         y: snap(point.y + (moveEvent.clientY - startY) / zoom),
       };
-      saveRoute(connection, orthogonalRoutePoints(source, target, movedBends));
+      saveRoute(connection, orthogonalRoutePoints(source, target, movedBends), gestureKey);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -84,6 +85,7 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     const horizontal = start.y === end.y;
     const startClientX = event.clientX;
     const startClientY = event.clientY;
+    const gestureKey = createId("segment-drag");
     const move = (moveEvent: PointerEvent) => {
       const nextRoute = route.map((point) => ({ ...point }));
       const delta = horizontal ? snap((moveEvent.clientY - startClientY) / zoom) : snap((moveEvent.clientX - startClientX) / zoom);
@@ -100,7 +102,7 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
         else if (segmentIndex === route.length - 2) { nextRoute[segmentIndex].x = x; nextRoute.splice(nextRoute.length - 1, 0, { x, y: end.y }); }
         else { nextRoute[segmentIndex].x = x; nextRoute[segmentIndex + 1].x = x; }
       }
-      saveRoute(connection, nextRoute);
+      saveRoute(connection, nextRoute, gestureKey);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -116,7 +118,8 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     setSelection({ type: "node", id: node.id });
     const startX = event.clientX;
     const startY = event.clientY;
-    const move = (moveEvent: PointerEvent) => updateNode(node.id, { x: snap(node.x + (moveEvent.clientX - startX) / zoom), y: snap(node.y + (moveEvent.clientY - startY) / zoom) });
+    const gestureKey = createId("node-drag");
+    const move = (moveEvent: PointerEvent) => updateNode(node.id, { x: snap(node.x + (moveEvent.clientX - startX) / zoom), y: snap(node.y + (moveEvent.clientY - startY) / zoom) }, gestureKey);
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -126,7 +129,8 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     event.stopPropagation();
     const startX = event.clientX;
     const startY = event.clientY;
-    const move = (moveEvent: PointerEvent) => updateNode(node.id, { width: Math.max(192, snap(node.width + (moveEvent.clientX - startX) / zoom)), height: Math.max(160, snap(node.height + (moveEvent.clientY - startY) / zoom)) });
+    const gestureKey = createId("node-resize");
+    const move = (moveEvent: PointerEvent) => updateNode(node.id, { width: Math.max(192, snap(node.width + (moveEvent.clientX - startX) / zoom)), height: Math.max(160, snap(node.height + (moveEvent.clientY - startY) / zoom)) }, gestureKey);
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);

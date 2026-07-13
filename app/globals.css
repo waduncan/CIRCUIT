@@ -70,7 +70,8 @@ button { color: inherit; }
 .canvas-toolbar { height: 46px; min-height: 46px; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.96); z-index: 8; }
 .tool-group { display: flex; gap: 3px; align-items: center; }
 .tool { border: 0; background: transparent; border-radius: 6px; width: 29px; height: 29px; cursor: pointer; color: #65778a; font-size: 14px; }
-.tool:hover, .tool.active { color: #1f5bd7; background: #edf3ff; }
+.tool:hover:not(:disabled), .tool.active { color: #1f5bd7; background: #edf3ff; }
+.tool:disabled { opacity: 0.35; cursor: default; }
 .tool.active-connect { color: #fff; background: var(--blue); }
 .tool-separator { width: 1px; height: 20px; background: #e0e6eb; margin: 0 3px; }
 .canvas-crumb { display: flex; align-items: center; gap: 7px; margin: 0 auto; color: #8492a0; font-size: 10px; }
