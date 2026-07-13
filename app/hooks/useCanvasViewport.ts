@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
-import { boundsFromNodes, expandBounds } from "../model/viewport";
-import type { Bounds, CanvasSettings, Point, SystemNode } from "../model/types";
+import { boundsFromContainers, boundsFromNodes, expandBounds, unionBounds } from "../model/viewport";
+import type { Bounds, CanvasSettings, DiagramContainer, Point, SystemNode } from "../model/types";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4;
@@ -14,11 +14,12 @@ export function screenToCanvasPoint(client: Point, viewport: DOMRect, pan: Point
 
 type CanvasViewportOptions = {
   nodes: SystemNode[];
+  containers: DiagramContainer[];
   canvas: CanvasSettings;
   onClearSelection: () => void;
 };
 
-export function useCanvasViewport({ nodes, canvas, onClearSelection }: CanvasViewportOptions) {
+export function useCanvasViewport({ nodes, containers, canvas, onClearSelection }: CanvasViewportOptions) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ zoom: 0.82, pan: { x: 20, y: 20 } as Point });
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
@@ -92,15 +93,15 @@ export function useCanvasViewport({ nodes, canvas, onClearSelection }: CanvasVie
   const resetView = useCallback(() => setView({ zoom: 1, pan: { x: 40, y: 40 } }), []);
 
   const fitDocument = useCallback(() => {
-    if (canvas.mode === "infinite" && !nodes.length) {
+    if (canvas.mode === "infinite" && !nodes.length && !containers.length) {
       resetView();
       return;
     }
     const bounds = canvas.mode === "bounded"
       ? { x: 0, y: 0, width: canvas.width, height: canvas.height }
-      : expandBounds(boundsFromNodes(nodes), 160);
+      : expandBounds(unionBounds(boundsFromNodes(nodes), boundsFromContainers(containers)), 160);
     fitBounds(bounds);
-  }, [canvas, fitBounds, nodes, resetView]);
+  }, [canvas, containers, fitBounds, nodes, resetView]);
 
   const toCanvasPoint = useCallback((client: Point, viewport: DOMRect) => screenToCanvasPoint(client, viewport, view.pan, view.zoom), [view]);
 

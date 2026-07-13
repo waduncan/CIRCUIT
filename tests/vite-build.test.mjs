@@ -17,3 +17,9 @@ test("builds the local Vite SPA shell", async () => {
   assert.match(script, /drag between handles to move a whole segment/);
   assert.match(script, /Ctrl\+right-click removes one/);
 });
+
+test("deduplicates React for local Vite development", async () => {
+  const config = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
+
+  assert.match(config, /dedupe:\s*\["react",\s*"react-dom"\]/);
+});

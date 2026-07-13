@@ -1,6 +1,6 @@
 import { capabilityConfig, icons, primitiveLibrary } from "./catalog";
 import { connectionRoute, portPosition, routeMidpoint, svgPath } from "./routing";
-import type { Capability, Project, SystemNode } from "./types";
+import type { Capability, DiagramContainer, Project, SystemNode } from "./types";
 
 // Pure, dependency-free renderer that serialises a Project into a standalone SVG document.
 // Text is emitted as real <text> (stays sharp and selectable, never rasterised) and geometry
@@ -42,6 +42,10 @@ function includePoint(bounds: Bounds, x: number, y: number): void {
 
 export function diagramBounds(project: Project): Bounds {
   const bounds: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const container of project.containers) {
+    includePoint(bounds, container.x, container.y - 32);
+    includePoint(bounds, container.x + container.width, container.y + container.height);
+  }
   for (const node of project.nodes) {
     includePoint(bounds, node.x, node.y);
     includePoint(bounds, node.x + node.width, node.y + node.height);
@@ -55,6 +59,14 @@ export function diagramBounds(project: Project): Bounds {
   }
   if (!Number.isFinite(bounds.minX)) return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
   return bounds;
+}
+
+function renderContainer(container: DiagramContainer): string {
+  return [
+    `<rect x="${container.x}" y="${container.y}" width="${container.width}" height="${container.height}" rx="12" fill="${esc(container.color)}" fill-opacity="${container.opacity}" stroke="${esc(container.color)}" stroke-opacity="0.62" stroke-width="2"/>`,
+    `<text x="${container.x + 8}" y="${container.y - 12}" font-size="7" font-weight="800" letter-spacing="0.8" fill="${esc(container.color)}" fill-opacity="0.72">${esc(container.kind.toUpperCase())}</text>`,
+    `<text x="${container.x + 68}" y="${container.y - 12}" font-size="12" font-weight="800" fill="${esc(container.color)}">${esc(container.name)}</text>`,
+  ].join("");
 }
 
 function renderNode(node: SystemNode): string {
@@ -153,6 +165,7 @@ export function exportDiagramSvg(project: Project, options: ExportSvgOptions = {
     layers.push(`<text x="${padding}" y="${padding + 14}" font-size="10" fill="#8794a1">${esc(subtitle)}</text>`);
   }
   layers.push(`<g transform="translate(${offsetX} ${offsetY})">`);
+  for (const container of project.containers) layers.push(renderContainer(container));
   for (const connection of project.connections) layers.push(renderConnection(project, connection.id));
   for (const node of project.nodes) layers.push(renderNode(node));
   layers.push(`</g>`);
