@@ -1,4 +1,4 @@
-import type { CanvasSettings, Port, Project, SystemNode } from "./types";
+import type { CanvasSettings, DiagramContainer, Port, Project, SystemNode } from "./types";
 
 export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
@@ -8,17 +8,21 @@ export const createId = (prefix: string) => `${prefix}-${Math.random().toString(
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
 export function createDemoProject(): Project {
+  const containers: DiagramContainer[] = [
+    { id: "clinical-network", name: "Hospital Network", description: "Core clinical systems hosted on the hospital network.", kind: "logical", x: 96, y: 144, width: 704, height: 352, color: "#2f6df6", opacity: 0.1 },
+    { id: "imaging-network", name: "Imaging Services", description: "PACS, modalities, and supporting data services.", kind: "logical", x: 816, y: 144, width: 720, height: 704, color: "#00a78e", opacity: 0.1 },
+  ];
   const nodes: SystemNode[] = [
     {
       id: "emr-1", name: "Epic EMR", kind: "emr", description: "Enterprise electronic medical record", x: 144, y: 208, width: 224, height: 176, color: "#2859d9", capabilities: ["HL7", "FHIR"],
-      ports: [{ id: "emr-orm-out", name: "Orders", direction: "outbound", capability: "HL7", subtype: "ORM" }],
+      ports: [{ id: "emr-orm-out", name: "Orders", direction: "outbound", capability: "HL7", subtype: "ORM" }], containerId: "clinical-network",
     },
     {
       id: "ie-1", name: "Rhapsody Engine", kind: "interface", description: "Clinical interface and routing engine", x: 496, y: 208, width: 232, height: 208, color: "#7c4dff", capabilities: ["HL7", "TCP"],
       ports: [
         { id: "ie-orm-in", name: "Orders In", direction: "inbound", capability: "HL7", subtype: "ORM" },
         { id: "ie-orm-out", name: "Orders Out", direction: "outbound", capability: "HL7", subtype: "ORM" },
-      ],
+      ], containerId: "clinical-network",
     },
     {
       id: "app-1", name: "PACS Application", kind: "application", description: "Imaging workflow and archive services", x: 864, y: 208, width: 240, height: 240, color: "#00a78e", capabilities: ["HL7", "DICOM", "TCP"],
@@ -26,18 +30,18 @@ export function createDemoProject(): Project {
         { id: "app-orm-in", name: "Orders", direction: "inbound", capability: "HL7", subtype: "ORM" },
         { id: "app-mwl-out", name: "Worklist", direction: "outbound", capability: "DICOM", subtype: "MWL" },
         { id: "app-store-in", name: "Image Store", direction: "inbound", capability: "DICOM", subtype: "C-STORE SCP" },
-      ],
+      ], containerId: "imaging-network",
     },
     {
       id: "cart-1", name: "Echo Cart 04", kind: "device", description: "Cardiology ultrasound modality", x: 1248, y: 208, width: 224, height: 208, color: "#d14d72", capabilities: ["DICOM", "General Data"],
       ports: [
         { id: "cart-mwl-in", name: "Worklist", direction: "inbound", capability: "DICOM", subtype: "MWL" },
         { id: "cart-store-out", name: "Images", direction: "outbound", capability: "DICOM", subtype: "C-STORE SCU" },
-      ],
+      ], containerId: "imaging-network",
     },
     {
       id: "db-1", name: "PACS Database", kind: "database", description: "PACS configuration and metadata", x: 864, y: 592, width: 240, height: 176, color: "#e67e22", capabilities: ["TCP", "General Data"],
-      ports: [{ id: "db-tcp-in", name: "Database", direction: "inbound", capability: "TCP", subtype: "Server" }],
+      ports: [{ id: "db-tcp-in", name: "Database", direction: "inbound", capability: "TCP", subtype: "Server" }], containerId: "imaging-network",
     },
   ];
 
@@ -48,6 +52,7 @@ export function createDemoProject(): Project {
     description: "Logical integration map for cardiology ordering, modality worklist, and image acquisition.",
     updatedAt: new Date().toISOString(),
     canvas: { ...DEFAULT_CANVAS },
+    containers,
     nodes,
     connections: [
       { id: "c1", sourceNodeId: "emr-1", sourcePortId: "emr-orm-out", targetNodeId: "ie-1", targetPortId: "ie-orm-in", capability: "HL7", subtype: "ORM", dataType: "Cardiology order", description: "Outbound signed order" },
@@ -64,7 +69,7 @@ export function createDemoProject(): Project {
 }
 
 export function blankProject(name: string, description: string): Project {
-  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, nodes: [], connections: [], processes: [], customLibrary: [] };
+  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, containers: [], nodes: [], connections: [], processes: [], customLibrary: [] };
 }
 
 export function calculateProcessRoute(project: Project, checkpoints: string[]): string[] {
@@ -109,6 +114,20 @@ export function migrateProjectDocument(value: unknown): Project | null {
   if (!value || typeof value !== "object") return null;
   const project = value as Partial<Project>;
   if (project.version !== 1 || !Array.isArray(project.nodes) || !Array.isArray(project.connections) || !Array.isArray(project.processes)) return null;
+  const containers = Array.isArray(project.containers) ? project.containers.map((container) => ({
+    ...container,
+    id: container.id ?? createId("container"),
+    name: container.name ?? "Untitled container",
+    description: container.description ?? "",
+    kind: container.kind === "physical" ? "physical" as const : "logical" as const,
+    x: Number(container.x) || 0,
+    y: Number(container.y) || 0,
+    width: Math.max(240, Number(container.width) || 480),
+    height: Math.max(160, Number(container.height) || 320),
+    color: container.color ?? "#2f6df6",
+    opacity: Math.min(0.35, Math.max(0.04, Number(container.opacity) || 0.1)),
+  })) : [];
+  const containerIds = new Set(containers.map((container) => container.id));
   return {
     ...project,
     version: 1,
@@ -121,7 +140,8 @@ export function migrateProjectDocument(value: unknown): Project | null {
       width: Math.max(640, Number(project.canvas?.width) || DEFAULT_CANVAS.width),
       height: Math.max(480, Number(project.canvas?.height) || DEFAULT_CANVAS.height),
     },
-    nodes: project.nodes,
+    containers,
+    nodes: project.nodes.map((node) => containerIds.has(node.containerId ?? "") ? node : { ...node, containerId: undefined }),
     connections: project.connections,
     processes: project.processes,
     customLibrary: Array.isArray(project.customLibrary) ? project.customLibrary : [],

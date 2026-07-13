@@ -1,4 +1,4 @@
-import type { Bounds, Point, SystemNode } from "./types";
+import type { Bounds, DiagramContainer, Point, SystemNode } from "./types";
 
 export const EMPTY_BOUNDS: Bounds = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -8,6 +8,15 @@ export function boundsFromNodes(nodes: SystemNode[]): Bounds {
   const minY = Math.min(...nodes.map((node) => node.y));
   const maxX = Math.max(...nodes.map((node) => node.x + node.width));
   const maxY = Math.max(...nodes.map((node) => node.y + node.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+export function boundsFromContainers(containers: DiagramContainer[]): Bounds {
+  if (!containers.length) return EMPTY_BOUNDS;
+  const minX = Math.min(...containers.map((container) => container.x));
+  const minY = Math.min(...containers.map((container) => container.y - 32));
+  const maxX = Math.max(...containers.map((container) => container.x + container.width));
+  const maxY = Math.max(...containers.map((container) => container.y + container.height));
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 

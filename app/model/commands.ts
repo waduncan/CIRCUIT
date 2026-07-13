@@ -1,8 +1,11 @@
-import type { CanvasSettings, Connection, DataFlowProcess, LibraryItem, Project, Selection, SystemNode } from "./types";
+import { containerForNode, reconcileNodeContainers } from "./containers";
+import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Project, Selection, SystemNode } from "./types";
 
 export type ProjectCommand =
   | { type: "node.add"; node: SystemNode }
   | { type: "node.update"; id: string; patch: Partial<SystemNode> }
+  | { type: "container.add"; container: DiagramContainer }
+  | { type: "container.update"; id: string; patch: Partial<DiagramContainer> }
   | { type: "connection.add"; connection: Connection }
   | { type: "connection.update"; id: string; patch: Partial<Connection> }
   | { type: "process.add"; process: DataFlowProcess }
@@ -16,9 +19,23 @@ export type ProjectCommand =
 export function applyProjectCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
     case "node.add":
-      return { ...project, nodes: [...project.nodes, command.node] };
+      return { ...project, nodes: [...project.nodes, { ...command.node, containerId: containerForNode(command.node, project.containers) }] };
     case "node.update":
-      return { ...project, nodes: project.nodes.map((node) => node.id === command.id ? { ...node, ...command.patch } : node) };
+      return { ...project, nodes: project.nodes.map((node) => {
+        if (node.id !== command.id) return node;
+        const updated = { ...node, ...command.patch };
+        const geometryChanged = "x" in command.patch || "y" in command.patch || "width" in command.patch || "height" in command.patch;
+        return geometryChanged ? { ...updated, containerId: containerForNode(updated, project.containers) } : updated;
+      }) };
+    case "container.add": {
+      const containers = [...project.containers, command.container];
+      return { ...project, containers, nodes: reconcileNodeContainers(project.nodes, containers) };
+    }
+    case "container.update": {
+      const containers = project.containers.map((container) => container.id === command.id ? { ...container, ...command.patch } : container);
+      const geometryChanged = "x" in command.patch || "y" in command.patch || "width" in command.patch || "height" in command.patch;
+      return { ...project, containers, nodes: geometryChanged ? reconcileNodeContainers(project.nodes, containers) : project.nodes };
+    }
     case "connection.add":
       return { ...project, connections: [...project.connections, command.connection] };
     case "connection.update":
@@ -36,6 +53,9 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
     case "canvas.update":
       return { ...project, canvas: { ...project.canvas, ...command.patch } };
     case "selection.delete":
+      if (command.selection.type === "container") {
+        return { ...project, containers: project.containers.filter((container) => container.id !== command.selection.id), nodes: project.nodes.map((node) => node.containerId === command.selection.id ? { ...node, containerId: undefined } : node) };
+      }
       if (command.selection.type === "node") {
         return {
           ...project,

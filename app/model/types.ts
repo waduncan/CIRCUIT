@@ -27,6 +27,20 @@ export type SystemNode = {
   color: string;
   capabilities: Capability[];
   ports: Port[];
+  containerId?: string;
+};
+
+export type DiagramContainer = {
+  id: string;
+  name: string;
+  description: string;
+  kind: "logical" | "physical";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
 };
 
 export type Connection = {
@@ -79,6 +93,7 @@ export type Project = {
   description: string;
   updatedAt: string;
   canvas: CanvasSettings;
+  containers: DiagramContainer[];
   nodes: SystemNode[];
   connections: Connection[];
   processes: DataFlowProcess[];
@@ -86,6 +101,7 @@ export type Project = {
 };
 
 export type Selection =
+  | { type: "container"; id: string }
   | { type: "node"; id: string }
   | { type: "connection"; id: string }
   | { type: "process"; id: string }

@@ -19,9 +19,9 @@ test("persists configurable canvas settings with legacy project defaults", async
 });
 
 test("supports cursor-centered zoom and fit controls", async () => {
-  const [viewport, app] = await Promise.all([
+  const [viewport, toolbar] = await Promise.all([
     readFile(new URL("app/hooks/useCanvasViewport.ts", root), "utf8"),
-    readFile(new URL("app/DiagramApp.tsx", root), "utf8"),
+    readFile(new URL("app/components/CanvasToolbar.tsx", root), "utf8"),
   ]);
 
   assert.match(viewport, /MIN_ZOOM\s*=\s*0\.1/);
@@ -31,9 +31,9 @@ test("supports cursor-centered zoom and fit controls", async () => {
   assert.match(viewport, /fitDocument/);
   assert.match(viewport, /fitBounds/);
   assert.match(viewport, /resetView/);
-  assert.match(app, /Fit document/);
-  assert.match(app, /Fit selection/);
-  assert.match(app, />1:1<\/button>/);
+  assert.match(toolbar, /Fit document/);
+  assert.match(toolbar, /Fit selection/);
+  assert.match(toolbar, />1:1<\/button>/);
 });
 
 test("renders and culls layers using the current viewport instead of a fixed SVG", async () => {
