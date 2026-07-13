@@ -59,12 +59,26 @@ export type LibraryItem = {
   capabilities: Capability[];
 };
 
+export type CanvasSettings = {
+  mode: "bounded" | "infinite";
+  width: number;
+  height: number;
+};
+
+export type Bounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type Project = {
   version: 1;
   id: string;
   name: string;
   description: string;
   updatedAt: string;
+  canvas: CanvasSettings;
   nodes: SystemNode[];
   connections: Connection[];
   processes: DataFlowProcess[];

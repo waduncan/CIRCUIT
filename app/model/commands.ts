@@ -1,4 +1,4 @@
-import type { Connection, DataFlowProcess, LibraryItem, Project, Selection, SystemNode } from "./types";
+import type { CanvasSettings, Connection, DataFlowProcess, LibraryItem, Project, Selection, SystemNode } from "./types";
 
 export type ProjectCommand =
   | { type: "node.add"; node: SystemNode }
@@ -10,6 +10,7 @@ export type ProjectCommand =
   | { type: "library.add"; item: LibraryItem }
   | { type: "library.remove"; id: string }
   | { type: "library.replace"; items: LibraryItem[] }
+  | { type: "canvas.update"; patch: Partial<CanvasSettings> }
   | { type: "selection.delete"; selection: Exclude<Selection, null> };
 
 export function applyProjectCommand(project: Project, command: ProjectCommand): Project {
@@ -32,6 +33,8 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
       return { ...project, customLibrary: project.customLibrary.filter((item) => item.id !== command.id) };
     case "library.replace":
       return { ...project, customLibrary: command.items };
+    case "canvas.update":
+      return { ...project, canvas: { ...project.canvas, ...command.patch } };
     case "selection.delete":
       if (command.selection.type === "node") {
         return {

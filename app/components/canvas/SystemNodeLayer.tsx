@@ -1,6 +1,7 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { capabilityConfig, icons, primitiveLibrary } from "../../model/catalog";
-import type { DataFlowProcess, Port, Project, Selection, SystemNode } from "../../model/types";
+import { intersectsBounds, nodeBounds } from "../../model/viewport";
+import type { Bounds, DataFlowProcess, Port, Project, Selection, SystemNode } from "../../model/types";
 
 type SystemNodeLayerProps = {
   project: Project;
@@ -8,12 +9,13 @@ type SystemNodeLayerProps = {
   connecting: { nodeId: string; portId: string } | null;
   activeRoute: string[];
   activeProcess?: DataFlowProcess;
+  viewportBounds: Bounds;
   onBeginNodeDrag: (event: ReactPointerEvent, node: SystemNode) => void;
   onBeginResize: (event: ReactPointerEvent, node: SystemNode) => void;
   onPortClick: (node: SystemNode, port: Port) => void;
 };
 
-export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, onBeginNodeDrag, onBeginResize, onPortClick }: SystemNodeLayerProps) {
+export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick }: SystemNodeLayerProps) {
   return (
     <>
       {project.nodes.map((node) => {
@@ -24,6 +26,7 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
           const edge = project.connections.find((item) => item.id === edgeId);
           return edge?.sourceNodeId === node.id || edge?.targetNodeId === node.id;
         }));
+        if (!selected && !inActiveProcess && !intersectsBounds(nodeBounds(node), viewportBounds)) return null;
         return (
           <article
             key={node.id}
