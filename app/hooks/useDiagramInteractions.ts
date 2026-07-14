@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { createId, snap } from "../model/project";
-import { compactPoints, orthogonalRoutePoints, portPosition } from "../model/routing";
-import type { Connection, Point, Project, Selection, SystemNode } from "../model/types";
+import { compactPoints, orthogonalRoutePoints, portPosition, portTilePosition } from "../model/routing";
+import type { Connection, Point, Port, PortSide, Project, Selection, SystemNode } from "../model/types";
 
 type DiagramInteractionOptions = {
   project: Project;
@@ -136,5 +136,42 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     window.addEventListener("pointerup", up);
   };
 
-  return { getPortPosition, saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize };
+  const beginPortDrag = (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest(".port-resize-handle")) return;
+    event.stopPropagation();
+    const element = event.currentTarget;
+    const startX = event.clientX; const startY = event.clientY;
+    const origin = portTilePosition({ nodes: [node] }, node.id, port.id);
+    const gestureKey = createId("port-drag");
+    let moved = false;
+    const move = (moveEvent: PointerEvent) => {
+      const x = origin.x + (moveEvent.clientX - startX) / zoom;
+      const y = origin.y + (moveEvent.clientY - startY) / zoom;
+      moved ||= Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 3;
+      if (!moved) return;
+      const distances: Array<[PortSide, number]> = [["left", Math.abs(x - node.x)], ["right", Math.abs(x - node.x - node.width)], ["top", Math.abs(y - node.y)], ["bottom", Math.abs(y - node.y - node.height)]];
+      const side = distances.sort((a, b) => a[1] - b[1])[0][0];
+      const rawOffset = side === "left" || side === "right" ? (y - node.y) / node.height : (x - node.x) / node.width;
+      const dimension = side === "left" || side === "right" ? node.height : node.width;
+      const offset = Math.max(0.04, Math.min(0.96, snap(rawOffset * dimension) / dimension));
+      updateNode(node.id, { ports: node.ports.map((item) => item.id === port.id ? { ...item, side, offset } : item) }, gestureKey);
+    };
+    const up = () => {
+      if (moved) { element.dataset.suppressClick = "true"; window.setTimeout(() => delete element.dataset.suppressClick, 0); }
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+
+  const beginPortResize = (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => {
+    event.preventDefault(); event.stopPropagation();
+    const startX = event.clientX; const startY = event.clientY;
+    const startWidth = port.width ?? 92; const startHeight = port.height ?? 34;
+    const gestureKey = createId("port-resize");
+    const move = (moveEvent: PointerEvent) => updateNode(node.id, { ports: node.ports.map((item) => item.id === port.id ? { ...item, width: Math.max(56, snap(startWidth + (moveEvent.clientX - startX) / zoom)), height: Math.max(24, snap(startHeight + (moveEvent.clientY - startY) / zoom)) } : item) }, gestureKey);
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+
+  return { getPortPosition, saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize };
 }

@@ -13,9 +13,11 @@ type SystemNodeLayerProps = {
   onBeginNodeDrag: (event: ReactPointerEvent, node: SystemNode) => void;
   onBeginResize: (event: ReactPointerEvent, node: SystemNode) => void;
   onPortClick: (node: SystemNode, port: Port) => void;
+  onBeginPortDrag: (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => void;
+  onBeginPortResize: (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => void;
 };
 
-export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick }: SystemNodeLayerProps) {
+export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
   return (
     <>
       {project.nodes.map((node) => {
@@ -51,9 +53,9 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
               const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
               const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
               const index = sameSide.findIndex((item) => item.id === port.id);
-              const position = `${((index + 1) / (sameSide.length + 1)) * 100}%`;
-              const style: CSSProperties & { "--port-color": string } = { "--port-color": capabilityConfig[port.capability].color, ...(side === "left" || side === "right" ? { top: position } : { left: position }) };
-              return <button key={port.id} className={`port node-port side-${side} ${connecting ? "target-ready" : ""} ${connecting?.portId === port.id ? "source-active" : ""}`} style={style} onPointerDown={(event) => event.stopPropagation()} onClick={() => onPortClick(node, port)} title={`${port.capability} ${port.subtype}`}><i /><span>{port.name}</span></button>;
+              const position = `${(port.offset ?? (index + 1) / (sameSide.length + 1)) * 100}%`;
+              const style: CSSProperties & { "--port-color": string } = { "--port-color": capabilityConfig[port.capability].color, width: port.width ?? 92, height: port.height ?? 34, ...(side === "left" || side === "right" ? { top: position } : { left: position }) };
+              return <button key={port.id} className={`port node-port side-${side} ${connecting ? "target-ready" : ""} ${connecting?.portId === port.id ? "source-active" : ""}`} style={style} onPointerDown={(event) => onBeginPortDrag(event, node, port)} onClick={(event) => { if (!event.currentTarget.dataset.suppressClick) onPortClick(node, port); }} title={`${port.capability} ${port.subtype}`}><span className="port-copy"><strong>{port.name}</strong>{port.secondaryIdentifier && <small>{port.secondaryIdentifier}</small>}</span><i />{selected && <span className="port-resize-handle" onPointerDown={(event) => onBeginPortResize(event, node, port)} />}</button>;
             })}
             {selected && <button className="resize-handle" onPointerDown={(event) => onBeginResize(event, node)} aria-label={`Resize ${node.name}`} />}
           </article>
