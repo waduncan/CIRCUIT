@@ -21,7 +21,7 @@ import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
 import { cloneCompositeContent, compositeLibraryItems } from "./model/compositeTemplates";
 import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap, withConnectionDefaults } from "./model/project";
 import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
-import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, nodeBounds, unionBounds } from "./model/viewport";
+import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, gridBackgroundStyle, nodeBounds, unionBounds } from "./model/viewport";
 import { containerBounds } from "./model/containers";
 import type { Bounds, Connection, DataFlowProcess as Process, DiagramContainer, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
 import { downloadJson } from "./utils/download";
@@ -296,12 +296,12 @@ export default function DiagramApp() {
           <CanvasToolbar canvas={project.canvas} zoom={zoom} connecting={Boolean(connecting)} containerEditing={containerEditing} canUndo={canUndo} canRedo={canRedo} canFitSelection={Boolean(selectionBounds)} onSelect={() => { setContainerEditing(false); if (selection?.type === "container") setSelection(null); }} onPan={() => setConnecting(null)} onConnect={() => { setConnecting(null); showToast("Click an outbound port, then a compatible inbound port."); }} onAddProcess={addProcess} onToggleContainers={() => { setContainerEditing((value) => !value); setConnecting(null); setSelection(null); }} onAddContainer={addContainer} onUndo={undo} onRedo={redo} onUpdateCanvas={(patch) => dispatch({ type: "canvas.update", patch })} onZoomOut={zoomOut} onZoomIn={zoomIn} onFitDocument={fitDocument} onFitSelection={() => selectionBounds && fitBounds(selectionBounds)} onResetView={resetView} />
 
           <div
-            className={`canvas-viewport ${connecting ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""}`}
+            className={`canvas-viewport ${connecting ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""} ${zoom < 0.6 ? "grid-hide-minor" : ""}`}
             ref={canvasRef}
             onPointerDown={beginPan}
             onWheel={handleWheel}
             onDragOver={(event) => event.preventDefault()}
-            onDrop={handleCanvasDrop}
+            onDrop={handleCanvasDrop} style={gridBackgroundStyle(pan, zoom)}
           >
             <div className={`diagram-surface ${project.canvas.mode}`} style={{ width: Math.max(project.canvas.width, renderBounds.x + renderBounds.width), height: Math.max(project.canvas.height, renderBounds.y + renderBounds.height), transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
               <ContainerLayer containers={project.containers} selection={selection} editing={containerEditing} viewportBounds={viewportBounds} onSelect={(containerId) => setSelection({ type: "container", id: containerId })} onBeginDrag={beginContainerDrag} onBeginResize={beginContainerResize} />

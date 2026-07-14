@@ -94,6 +94,9 @@ button { color: inherit; }
 .canvas-viewport { flex: 1; min-height: 0; position: relative; overflow: hidden; cursor: grab; background-color: #f5f7f9; background-image: linear-gradient(#e3e8ed 1px, transparent 1px), linear-gradient(90deg, #e3e8ed 1px, transparent 1px), linear-gradient(#edf0f3 1px, transparent 1px), linear-gradient(90deg, #edf0f3 1px, transparent 1px); background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px; }
 .canvas-viewport:active { cursor: grabbing; }
 .canvas-viewport.is-connecting { cursor: crosshair; }
+/* Grid position/size are driven from pan/zoom inline so the grid tracks the coordinate space.
+   When zoomed far out, drop the fine (minor) grid to avoid dense moiré. */
+.canvas-viewport.grid-hide-minor { background-image: linear-gradient(#e3e8ed 1px, transparent 1px), linear-gradient(90deg, #e3e8ed 1px, transparent 1px); }
 .diagram-surface { position: absolute; left: 0; top: 0; min-width: 1px; min-height: 1px; transform-origin: 0 0; will-change: transform; }
 .diagram-surface.bounded { background: rgba(255,255,255,.72); box-shadow: 0 0 0 1px rgba(87,105,122,.18), 0 12px 36px rgba(34,54,74,.08); }
 .container-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
