@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { capabilityConfig, icons, primitiveLibrary } from "../../model/catalog";
 import type { DataFlowProcess, Port, Project, SystemNode as SystemNodeModel } from "../../model/types";
 import {
@@ -25,11 +25,16 @@ export type SystemNodeProps = {
 };
 
 export function SystemNode({ project, node, selected, inActiveProcess, connecting, activeProcess, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeProps) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
   return (
     <article
       className={`system-node ${node.kind === "nestable" ? "nested-node" : ""} ${node.nestedParentId ? "nested-child" : ""} ${project.presentation === "clean" ? "clean-view" : "detailed-view"} ${selected ? "selected" : ""} ${inActiveProcess ? "process-node" : ""}`}
       style={{ left: node.x, top: node.y, width: node.width, height: node.height, "--node-accent": node.color, "--process-accent": activeProcess?.color ?? node.color } as CSSProperties}
-      onPointerDown={(event) => onBeginNodeDrag(event, node)}
+      onPointerDown={(event) => {
+        if (!selected) event.currentTarget.dataset.selectOnly = "true";
+        if (!isPopoverOpen) onBeginNodeDrag(event, node);
+      }}
     >
       <div className="node-topline" />
       {node.kind === "nestable"
@@ -37,11 +42,11 @@ export function SystemNode({ project, node, selected, inActiveProcess, connectin
         : project.presentation === "clean"
           ? <div className="clean-node-body">
             <strong>{node.name}</strong>
-            <Popover>
-              <PopoverTrigger>
-                <button className="rounded-md cursor:default hover:text-foreground hover:bg-gray-200 ">
-                  <MdMoreHoriz size="24px" />
-                </button>
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger onPointerDown={(event) => {
+                event.stopPropagation();
+              }}>
+                <MdMoreHoriz size="24px" />
               </PopoverTrigger>
               <PopoverContent>
                 <PopoverHeader>
