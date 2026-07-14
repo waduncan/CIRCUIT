@@ -45,7 +45,6 @@ export default function DiagramApp() {
   const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left", secondaryIdentifier: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
@@ -93,9 +92,10 @@ export default function DiagramApp() {
     dispatch({ type: "container.update", id: containerId, patch }, coalesceKey);
   }, [dispatch]);
   const updateConnection = useCallback((connectionId: string, patch: Partial<Connection>, coalesceKey?: string) => {
+    const connection = getProjectObject(project, "connection", connectionId);
+    if (connection?.routing?.busId && patch.routing?.trunkPoints) { dispatch({ type: "connection.bus.update", busId: connection.routing.busId, trunkPoints: patch.routing.trunkPoints }, coalesceKey); return; }
     dispatch({ type: "connection.update", id: connectionId, patch }, coalesceKey);
-  }, [dispatch]);
-
+  }, [dispatch, project]);
   const updateProcess = useCallback((processId: string, patch: Partial<Process>, coalesceKey?: string) => {
     dispatch({ type: "process.update", id: processId, patch }, coalesceKey);
   }, [dispatch]);

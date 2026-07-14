@@ -106,6 +106,17 @@ export type Connection = {
   bendPoints?: Point[];
   style?: ConnectionStyle;
   labels?: ConnectionLabel[];
+  routing?: ConnectionRouting;
+};
+
+export type ConnectionCrossingStyle = "bridge" | "no-connect";
+
+export type ConnectionRouting = {
+  busId?: string;
+  trunkPoints: Point[];
+  parallelOffset: number;
+  crossingStyle: ConnectionCrossingStyle;
+  zIndex: number;
 };
 
 export type ConnectionLineStyle = "solid" | "dashed" | "dotted";

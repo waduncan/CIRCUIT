@@ -124,6 +124,11 @@ button { color: inherit; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 18; }
 .canvas-viewport.ctrl-modifier .edge-hit { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='%232f6df6' stroke='white' stroke-width='2'/%3E%3Cpath d='M14 8v12M8 14h12' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 14 14, cell; }
 .edge-line { fill: none; stroke: var(--edge-color); stroke-width: var(--edge-width, 2.4); stroke-dasharray: var(--edge-dash, none); stroke-linecap: square; stroke-linejoin: round; opacity: var(--edge-opacity, .72); transition: .2s ease; pointer-events: none; }
+.connection-junction { fill: var(--edge-color); stroke: #fff; stroke-width: 2; pointer-events: none; }
+.connection-junction.editable { pointer-events: all; cursor: move; }
+.connection-crossing { pointer-events: none; }
+.connection-crossing circle { fill: #fff; stroke: var(--edge-color); stroke-width: 2; }
+.connection-crossing.no-connect path { fill: none; stroke: var(--edge-color); stroke-width: 1.5; stroke-linecap: round; }
 .edge-segment-hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; }
 .edge-segment-hit.horizontal { cursor: ns-resize; }
 .edge-segment-hit.vertical { cursor: ew-resize; }

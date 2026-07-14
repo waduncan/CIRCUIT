@@ -24,6 +24,21 @@ type ConnectionLayerProps = {
   onUpdateConnection: (connectionId: string, patch: Partial<Connection>, coalesceKey?: string) => void;
 };
 
+function routeCrossings(route: Point[], other: Point[]): Point[] {
+  const result: Point[] = [];
+  for (let a = 0; a < route.length - 1; a += 1) for (let b = 0; b < other.length - 1; b += 1) {
+    const p1 = route[a], p2 = route[a + 1], q1 = other[b], q2 = other[b + 1];
+    const pVertical = p1.x === p2.x, qVertical = q1.x === q2.x;
+    if (pVertical === qVertical) continue;
+    const vertical = pVertical ? [p1, p2] : [q1, q2];
+    const horizontal = pVertical ? [q1, q2] : [p1, p2];
+    const point = { x: vertical[0].x, y: horizontal[0].y };
+    const within = point.y > Math.min(vertical[0].y, vertical[1].y) && point.y < Math.max(vertical[0].y, vertical[1].y) && point.x > Math.min(horizontal[0].x, horizontal[1].x) && point.x < Math.max(horizontal[0].x, horizontal[1].x);
+    if (within && !result.some((item) => item.x === point.x && item.y === point.y)) result.push(point);
+  }
+  return result;
+}
+
 export function ConnectionLayer({
   project,
   selection,
@@ -42,13 +57,15 @@ export function ConnectionLayer({
   onRemoveBend,
   onUpdateConnection,
 }: ConnectionLayerProps) {
+  const orderedConnections = [...project.connections].sort((a, b) => (a.routing?.zIndex ?? 0) - (b.routing?.zIndex ?? 0));
+  const orderedRoutes = orderedConnections.map((connection) => connectionRoute(project, connection));
   return (
     <svg className="connection-layer" style={{ left: renderBounds.x, top: renderBounds.y, width: renderBounds.width, height: renderBounds.height }} viewBox={`${renderBounds.x} ${renderBounds.y} ${renderBounds.width} ${renderBounds.height}`} aria-label="System connections">
       <defs>
         <filter id="edgeGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
         <marker id="connectionArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="context-stroke" /></marker>
       </defs>
-      {project.connections.map((connection) => {
+      {orderedConnections.map((connection, connectionIndex) => {
         const active = activeRoute.includes(connection.id);
         const selected = selection?.type === "connection" && selection.id === connection.id;
         const routePoints = connectionRoute(project, connection);
@@ -57,6 +74,7 @@ export function ConnectionLayer({
         const accent = activeProcess?.color ?? capabilityConfig[connection.capability].color;
         const style = connection.style ?? { lineStyle: "solid", width: 2.4, opacity: 0.72, arrowStyle: "none" };
         const labels = connection.labels ?? [];
+        const crossings = orderedRoutes.slice(0, connectionIndex).flatMap((otherRoute) => routeCrossings(routePoints, otherRoute));
         return (
           <g
             key={connection.id}
@@ -89,6 +107,17 @@ export function ConnectionLayer({
               }}
             />
             <path className="edge-line" d={path} markerStart={style.arrowStyle === "start" || style.arrowStyle === "both" ? "url(#connectionArrow)" : undefined} markerEnd={style.arrowStyle === "end" || style.arrowStyle === "both" ? "url(#connectionArrow)" : undefined} style={{ "--edge-color": active ? accent : (style.color || capabilityConfig[connection.capability].color), "--edge-width": style.width, "--edge-opacity": style.opacity, "--edge-dash": style.lineStyle === "dashed" ? "10 7" : style.lineStyle === "dotted" ? "2 6" : "none" } as CSSProperties} />
+            {crossings.map((point, index) => <g key={`${connection.id}-crossing-${index}`} className={`connection-crossing ${connection.routing?.crossingStyle ?? "bridge"}`}><circle cx={point.x} cy={point.y} r="6" />{connection.routing?.crossingStyle === "no-connect" && <path d={`M ${point.x - 3} ${point.y - 3} L ${point.x + 3} ${point.y + 3} M ${point.x + 3} ${point.y - 3} L ${point.x - 3} ${point.y + 3}`} />}</g>)}
+            {(connection.routing?.trunkPoints ?? []).map((point, index) => <circle key={`${connection.id}-junction-${index}`} className={`connection-junction ${selected ? "editable" : ""}`} cx={point.x + (connection.routing?.parallelOffset ?? 0)} cy={point.y + (connection.routing?.parallelOffset ?? 0)} r={selected ? 6 : 4} onPointerDown={(event) => {
+              if (!selected) return;
+              event.preventDefault(); event.stopPropagation();
+              const startX = event.clientX, startY = event.clientY;
+              const trunkPoints = connection.routing?.trunkPoints ?? [];
+              const gestureKey = `bus-trunk:${connection.routing?.busId ?? connection.id}:${index}`;
+              const move = (moveEvent: PointerEvent) => onUpdateConnection(connection.id, { routing: { ...connection.routing!, trunkPoints: trunkPoints.map((item, itemIndex) => itemIndex === index ? { x: snap(point.x + (moveEvent.clientX - startX) / zoom), y: snap(point.y + (moveEvent.clientY - startY) / zoom) } : item) } }, gestureKey);
+              const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+              window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+            }} />)}
             {selected && routePoints.slice(1).map((point, segmentIndex) => {
               const start = routePoints[segmentIndex];
               return <line key={`${connection.id}-segment-${segmentIndex}`} className={`edge-segment-hit ${start.y === point.y ? "horizontal" : "vertical"}`} x1={start.x} y1={start.y} x2={point.x} y2={point.y} onPointerDown={(event) => onBeginSegmentDrag(event, connection, segmentIndex, routePoints)} />;
