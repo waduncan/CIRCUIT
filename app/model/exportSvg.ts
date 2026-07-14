@@ -173,6 +173,7 @@ function renderConnection(project: Project, connectionId: string): string {
   const dash = style.lineStyle === "dashed" ? ` stroke-dasharray="10 7"` : style.lineStyle === "dotted" ? ` stroke-dasharray="2 6"` : "";
   const markers = `${style.arrowStyle === "start" || style.arrowStyle === "both" ? ` marker-start="url(#exportConnectionArrow)"` : ""}${style.arrowStyle === "end" || style.arrowStyle === "both" ? ` marker-end="url(#exportConnectionArrow)"` : ""}`;
   const parts = [`<path d="${path}" fill="none" stroke="${esc(color)}" stroke-width="${style.width}" stroke-opacity="${style.opacity}" stroke-linecap="square" stroke-linejoin="round"${dash}${markers}/>`];
+  for (const point of connection.routing?.trunkPoints ?? []) parts.push(`<circle cx="${point.x + (connection.routing?.parallelOffset ?? 0)}" cy="${point.y + (connection.routing?.parallelOffset ?? 0)}" r="4" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
   for (const label of connection.labels ?? []) {
     const anchor = pointAlongRoute(route, label.position, label.anchor === "segment" ? label.segmentIndex ?? 0 : undefined);
     const halfW = Math.max(24, label.text.length * 3.2 + 9);
@@ -202,6 +203,7 @@ function renderLegend(project: Project, x: number, y: number, width: number): st
 }
 
 export function exportDiagramSvg(project: Project, options: ExportSvgOptions = {}): string {
+  project = { ...project, connections: [...project.connections].sort((a, b) => (a.routing?.zIndex ?? 0) - (b.routing?.zIndex ?? 0)) };
   const { background = "white", padding = 48, includeTitle = true, includeLegend = true } = options;
   const bounds = diagramBounds(project);
   const titleBand = includeTitle ? TITLE_BAND : 0;

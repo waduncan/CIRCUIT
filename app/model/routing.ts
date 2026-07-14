@@ -89,5 +89,12 @@ export function portPosition(project: Pick<Project, "nodes">, nodeId: string, po
 export function connectionRoute(project: Pick<Project, "nodes">, connection: Connection): Point[] {
   const source = portPosition(project, connection.sourceNodeId, connection.sourcePortId);
   const target = portPosition(project, connection.targetNodeId, connection.targetPortId);
+  const offset = connection.routing?.parallelOffset ?? 0;
+  const trunk = (connection.routing?.trunkPoints ?? []).map((point) => ({ x: point.x + offset, y: point.y + offset }));
+  if (trunk.length) {
+    const branchIn = orthogonalRoutePoints(source, trunk[0]);
+    const branchOut = orthogonalRoutePoints(trunk[trunk.length - 1], target);
+    return compactPoints([...branchIn, ...trunk.slice(1), ...branchOut.slice(1)]);
+  }
   return orthogonalRoutePoints(source, target, connection.bendPoints);
 }

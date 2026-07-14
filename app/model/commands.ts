@@ -1,7 +1,7 @@
 import { containerForNode, reconcileNodeContainers } from "./containers";
 import { reconcileNestedNodes } from "./nesting";
 import { getProjectObject } from "./projectObject";
-import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Project, Selection, SystemNode } from "./types";
+import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Point, Project, Selection, SystemNode } from "./types";
 
 export type ProjectCommand =
   | { type: "node.add"; node: SystemNode }
@@ -10,6 +10,7 @@ export type ProjectCommand =
   | { type: "container.update"; id: string; patch: Partial<DiagramContainer> }
   | { type: "connection.add"; connection: Connection }
   | { type: "connection.update"; id: string; patch: Partial<Connection> }
+  | { type: "connection.bus.update"; busId: string; trunkPoints: Point[] }
   | { type: "process.add"; process: DataFlowProcess }
   | { type: "process.update"; id: string; patch: Partial<DataFlowProcess> }
   | { type: "library.add"; item: LibraryItem }
@@ -49,6 +50,8 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
       return { ...project, connections: [...project.connections, command.connection] };
     case "connection.update":
       return { ...project, connections: project.connections.map((connection) => connection.id === command.id ? { ...connection, ...command.patch } : connection) };
+    case "connection.bus.update":
+      return { ...project, connections: project.connections.map((connection) => connection.routing?.busId === command.busId ? { ...connection, routing: { ...connection.routing, trunkPoints: command.trunkPoints } } : connection) };
     case "process.add":
       return { ...project, processes: [...project.processes, command.process] };
     case "process.update":

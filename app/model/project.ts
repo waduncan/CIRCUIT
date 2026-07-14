@@ -6,8 +6,9 @@ export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
 export const DEFAULT_CANVAS: CanvasSettings = { mode: "bounded", width: 2400, height: 1600 };
 export const defaultConnectionStyle = (): NonNullable<Connection["style"]> => ({ lineStyle: "solid", width: 2.4, opacity: 0.72, arrowStyle: "none" });
+export const defaultConnectionRouting = (): NonNullable<Connection["routing"]> => ({ trunkPoints: [], parallelOffset: 0, crossingStyle: "bridge", zIndex: 0 });
 export const defaultConnectionLabel = (connection: Pick<Connection, "capability" | "subtype">): NonNullable<Connection["labels"]>[number] => ({ id: createId("label"), text: `${connection.capability} · ${connection.subtype}`, anchor: "route", position: 0.5, offsetX: 0, offsetY: -14, background: true, rotation: 0 });
-export const withConnectionDefaults = (connection: Connection): Connection => ({ ...connection, style: connection.style ?? defaultConnectionStyle(), labels: connection.labels ?? [defaultConnectionLabel(connection)] });
+export const withConnectionDefaults = (connection: Connection): Connection => ({ ...connection, style: connection.style ?? defaultConnectionStyle(), labels: connection.labels ?? [defaultConnectionLabel(connection)], routing: connection.routing ?? defaultConnectionRouting() });
 
 export const createId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
@@ -166,6 +167,7 @@ export function migrateProjectDocument(value: unknown): Project | null {
     connections: project.connections.map((connection) => ({
       ...connection,
       style: { ...defaultConnectionStyle(), ...(connection.style ?? {}) },
+      routing: { ...defaultConnectionRouting(), ...(connection.routing ?? {}), trunkPoints: Array.isArray(connection.routing?.trunkPoints) ? connection.routing.trunkPoints : [] },
       labels: Array.isArray(connection.labels) ? connection.labels.map((label) => ({ ...label, id: label.id ?? createId("label"), anchor: label.anchor ?? "route", position: label.position ?? 0.5, offsetX: label.offsetX ?? 0, offsetY: label.offsetY ?? -14, background: label.background ?? true, rotation: label.rotation ?? 0 })) : [defaultConnectionLabel(connection)],
     })),
     processes: project.processes,
