@@ -1,5 +1,5 @@
 import { capabilityConfig, icons, primitiveLibrary } from "./catalog";
-import { connectionRoute, pointAlongRoute, portPosition, svgPath } from "./routing";
+import { connectionRoute, pointAlongRoute, portPosition, portTilePosition, svgPath } from "./routing";
 import type { Capability, DiagramContainer, Project, SystemNode } from "./types";
 
 // Pure, dependency-free renderer that serialises a Project into a standalone SVG document.
@@ -49,6 +49,11 @@ export function diagramBounds(project: Project): Bounds {
   for (const node of project.nodes) {
     includePoint(bounds, node.x, node.y);
     includePoint(bounds, node.x + node.width, node.y + node.height);
+    for (const port of node.ports) {
+      const position = portTilePosition(project, node.id, port.id);
+      includePoint(bounds, position.x - (port.width ?? 92) / 2 - 8, position.y - (port.height ?? 34) / 2 - 8);
+      includePoint(bounds, position.x + (port.width ?? 92) / 2 + 8, position.y + (port.height ?? 34) / 2 + 8);
+    }
   }
   for (const connection of project.connections) {
     const route = connectionRoute(project, connection);
@@ -131,19 +136,21 @@ function renderNode(node: SystemNode): string {
       parts.push(`<text x="${node.x + 12}" y="${node.y + node.height - 7}" font-size="10" font-weight="700" fill="#6f8192">${esc(truncate(node.composite.footer, node.width - 24, 10))}</text>`);
     }
   }
-  // Ports: dot on the node edge, label pill just inside.
+  // Port tiles straddle the node boundary; the connection anchor sits on the outside edge.
   const project = { nodes: [node] };
   for (const port of node.ports) {
-    const pos = portPosition(project, node.id, port.id);
+    const pos = portTilePosition(project, node.id, port.id);
     const color = capabilityConfig[port.capability].color;
     const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
-    const label = truncate(port.name, 88, 10);
-    const pillW = label.length * 6.2 + 10;
-    const pillX = side === "left" ? node.x + 8 : side === "right" ? node.x + node.width - 8 - pillW : Math.max(node.x + 4, Math.min(pos.x - pillW / 2, node.x + node.width - pillW - 4));
-    const pillY = side === "top" ? node.y + 8 : side === "bottom" ? node.y + node.height - 28 : pos.y - 10;
-    parts.push(`<rect x="${pillX.toFixed(1)}" y="${pillY.toFixed(1)}" width="${pillW.toFixed(1)}" height="20" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
-    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pillY + 14).toFixed(1)}" font-size="10" fill="#66798c">${esc(label)}</text>`);
-    parts.push(`<circle cx="${pos.x}" cy="${pos.y}" r="6" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
+    const width = port.width ?? 92; const height = port.height ?? 34;
+    const tileX = pos.x - width / 2; const tileY = pos.y - height / 2;
+    const anchorX = side === "left" ? tileX : side === "right" ? tileX + width : pos.x;
+    const anchorY = side === "top" ? tileY : side === "bottom" ? tileY + height : pos.y;
+    const label = truncate(port.name, width - 12, 10);
+    parts.push(`<rect x="${tileX.toFixed(1)}" y="${tileY.toFixed(1)}" width="${width}" height="${height}" rx="5" fill="${esc(color)}" fill-opacity="0.12" stroke="${esc(color)}" stroke-width="1.5"/>`);
+    parts.push(`<text x="${pos.x.toFixed(1)}" y="${(pos.y + (port.secondaryIdentifier ? -2 : 4)).toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="#43586c">${esc(label)}</text>`);
+    if (port.secondaryIdentifier) parts.push(`<text x="${pos.x.toFixed(1)}" y="${(pos.y + 10).toFixed(1)}" font-size="10" text-anchor="middle" fill="#718397">${esc(truncate(port.secondaryIdentifier, width - 12, 10))}</text>`);
+    parts.push(`<circle cx="${anchorX.toFixed(1)}" cy="${anchorY.toFixed(1)}" r="6" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
   }
   return parts.join("");
 }

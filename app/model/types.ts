@@ -15,6 +15,10 @@ export type Port = {
   capability: Capability;
   subtype: string;
   side?: PortSide;
+  secondaryIdentifier?: string;
+  offset?: number;
+  width?: number;
+  height?: number;
 };
 
 export type CompositeField = {
@@ -185,4 +189,5 @@ export type PortDraft = {
   subtype: string;
   name: string;
   side: PortSide;
+  secondaryIdentifier: string;
 };

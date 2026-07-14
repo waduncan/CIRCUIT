@@ -41,7 +41,7 @@ export default function DiagramApp() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateKind, setNewTemplateKind] = useState<PrimitiveKind>("application");
-  const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left" });
+  const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left", secondaryIdentifier: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,7 +100,7 @@ export default function DiagramApp() {
   }, [dispatch]);
 
   const showToast = (message: string) => setToast(message);
-  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, showToast });
+  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, showToast });
   const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ zoom, setSelection, updateContainer });
 
   const addContainer = () => {
@@ -173,13 +173,13 @@ export default function DiagramApp() {
     }
     const port: Port = {
       id: createId("port"),
-      ...portDraft,
+      ...portDraft, width: 92, height: 34, offset: (selectedNode.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === portDraft.side).length + 1) / (selectedNode.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === portDraft.side).length + 2),
       name:
         portDraft.name.trim() ||
         `${portDraft.subtype} ${portDraft.direction === "inbound" ? "In" : "Out"}`,
     };
     updateNode(selectedNode.id, { ports: [...selectedNode.ports, port] });
-    setPortDraft((current) => ({ ...current, name: "" }));
+    setPortDraft((current) => ({ ...current, name: "", secondaryIdentifier: "" }));
     showToast(`${port.capability} ${port.subtype} port added.`);
   };
 
@@ -326,7 +326,7 @@ export default function DiagramApp() {
                   showToast(`Bend point ${pointIndex + 1} removed.`);
                 }}
                 onUpdateConnection={updateConnection} />
-              <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} />
+              <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} onBeginPortDrag={beginPortDrag} onBeginPortResize={beginPortResize} />
             </div>
 
             <div className="minimap">

@@ -149,9 +149,15 @@ export function migrateProjectDocument(value: unknown): Project | null {
     },
     containers,
     nodes: project.nodes.map((node) => {
+      const rawPorts = Array.isArray(node.ports) ? node.ports : [];
       const normalized = {
         ...node,
-        ports: Array.isArray(node.ports) ? node.ports.map((port) => ({ ...port, side: port.side ?? (port.direction === "inbound" ? "left" as const : "right" as const) })) : [],
+        ports: rawPorts.map((port) => {
+          const side = port.side ?? (port.direction === "inbound" ? "left" as const : "right" as const);
+          const peers = rawPorts.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
+          const peerIndex = peers.findIndex((item) => item.id === port.id);
+          return { ...port, side, offset: Math.max(0, Math.min(1, port.offset ?? (peerIndex + 1) / (peers.length + 1))), width: Math.max(56, Number(port.width) || 92), height: Math.max(24, Number(port.height) || 34), secondaryIdentifier: port.secondaryIdentifier ?? "" };
+        }),
       };
       return containerIds.has(node.containerId ?? "") ? normalized : { ...normalized, containerId: undefined };
     }),

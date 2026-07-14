@@ -59,7 +59,7 @@ export function pointAlongRoute(points: Point[], position: number, segmentIndex?
   return points.at(-1) ?? { x: 0, y: 0 };
 }
 
-export function portPosition(project: Pick<Project, "nodes">, nodeId: string, portId: string): Point {
+export function portTilePosition(project: Pick<Project, "nodes">, nodeId: string, portId: string): Point {
   const node = project.nodes.find((item) => item.id === nodeId);
   if (!node) return { x: 0, y: 0 };
   const port = node.ports.find((item) => item.id === portId);
@@ -67,10 +67,22 @@ export function portPosition(project: Pick<Project, "nodes">, nodeId: string, po
   const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
   const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
   const index = sameSide.findIndex((item) => item.id === portId);
-  const ratio = (index + 1) / (sameSide.length + 1);
+  const ratio = Math.max(0, Math.min(1, port.offset ?? (index + 1) / (sameSide.length + 1)));
   if (side === "top") return { x: node.x + node.width * ratio, y: node.y };
   if (side === "bottom") return { x: node.x + node.width * ratio, y: node.y + node.height };
   return { x: side === "left" ? node.x : node.x + node.width, y: node.y + node.height * ratio };
+}
+
+export function portPosition(project: Pick<Project, "nodes">, nodeId: string, portId: string): Point {
+  const center = portTilePosition(project, nodeId, portId);
+  const node = project.nodes.find((item) => item.id === nodeId);
+  const port = node?.ports.find((item) => item.id === portId);
+  if (!node || !port) return center;
+  const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
+  if (side === "left") return { x: center.x - (port.width ?? 92) / 2, y: center.y };
+  if (side === "right") return { x: center.x + (port.width ?? 92) / 2, y: center.y };
+  if (side === "top") return { x: center.x, y: center.y - (port.height ?? 34) / 2 };
+  return { x: center.x, y: center.y + (port.height ?? 34) / 2 };
 }
 
 export function connectionRoute(project: Pick<Project, "nodes">, connection: Connection): Point[] {
