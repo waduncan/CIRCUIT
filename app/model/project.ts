@@ -1,4 +1,5 @@
 import type { CanvasSettings, DiagramContainer, Port, Project, SystemNode } from "./types";
+import { cloneCompositeContent, cloneCompositeTemplate, defaultCompositeTemplates } from "./compositeTemplates";
 
 export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
@@ -8,6 +9,8 @@ export const createId = (prefix: string) => `${prefix}-${Math.random().toString(
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
 export function createDemoProject(): Project {
+  const nodeTemplates = defaultCompositeTemplates.map(cloneCompositeTemplate);
+  const serverTemplate = nodeTemplates.find((template) => template.id === "server")!;
   const containers: DiagramContainer[] = [
     { id: "clinical-network", name: "Hospital Network", description: "Core clinical systems hosted on the hospital network.", kind: "logical", x: 96, y: 144, width: 704, height: 352, color: "#2f6df6", opacity: 0.1 },
     { id: "imaging-network", name: "Imaging Services", description: "PACS, modalities, and supporting data services.", kind: "logical", x: 816, y: 144, width: 720, height: 704, color: "#00a78e", opacity: 0.1 },
@@ -25,11 +28,11 @@ export function createDemoProject(): Project {
       ], containerId: "clinical-network",
     },
     {
-      id: "app-1", name: "PACS Application", kind: "application", description: "Imaging workflow and archive services", x: 864, y: 208, width: 240, height: 240, color: "#00a78e", capabilities: ["HL7", "DICOM", "TCP"],
+      id: "app-1", name: "PACS Application", kind: "application", description: "Imaging workflow and archive services", x: 864, y: 208, width: serverTemplate.defaultWidth, height: serverTemplate.defaultHeight, color: "#00a78e", capabilities: ["HL7", "DICOM", "TCP"], composite: cloneCompositeContent(serverTemplate),
       ports: [
-        { id: "app-orm-in", name: "Orders", direction: "inbound", capability: "HL7", subtype: "ORM" },
-        { id: "app-mwl-out", name: "Worklist", direction: "outbound", capability: "DICOM", subtype: "MWL" },
-        { id: "app-store-in", name: "Image Store", direction: "inbound", capability: "DICOM", subtype: "C-STORE SCP" },
+        { id: "app-orm-in", name: "Orders", direction: "inbound", capability: "HL7", subtype: "ORM", side: "left" },
+        { id: "app-mwl-out", name: "Worklist", direction: "outbound", capability: "DICOM", subtype: "MWL", side: "right" },
+        { id: "app-store-in", name: "Image Store", direction: "inbound", capability: "DICOM", subtype: "C-STORE SCP", side: "bottom" },
       ], containerId: "imaging-network",
     },
     {
@@ -65,11 +68,12 @@ export function createDemoProject(): Project {
       { id: "proc-complete", name: "Echo complete", description: "The technologist exports completed DICOM images from the cart to PACS.", checkpoints: ["cart-1", "app-1"], color: "#00a78e" },
     ],
     customLibrary: [],
+    nodeTemplates,
   };
 }
 
 export function blankProject(name: string, description: string): Project {
-  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, containers: [], nodes: [], connections: [], processes: [], customLibrary: [] };
+  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, containers: [], nodes: [], connections: [], processes: [], customLibrary: [], nodeTemplates: defaultCompositeTemplates.map(cloneCompositeTemplate) };
 }
 
 export function calculateProcessRoute(project: Project, checkpoints: string[]): string[] {
@@ -141,10 +145,17 @@ export function migrateProjectDocument(value: unknown): Project | null {
       height: Math.max(480, Number(project.canvas?.height) || DEFAULT_CANVAS.height),
     },
     containers,
-    nodes: project.nodes.map((node) => containerIds.has(node.containerId ?? "") ? node : { ...node, containerId: undefined }),
+    nodes: project.nodes.map((node) => {
+      const normalized = {
+        ...node,
+        ports: Array.isArray(node.ports) ? node.ports.map((port) => ({ ...port, side: port.side ?? (port.direction === "inbound" ? "left" as const : "right" as const) })) : [],
+      };
+      return containerIds.has(node.containerId ?? "") ? normalized : { ...normalized, containerId: undefined };
+    }),
     connections: project.connections,
     processes: project.processes,
     customLibrary: Array.isArray(project.customLibrary) ? project.customLibrary : [],
+    nodeTemplates: Array.isArray(project.nodeTemplates) && project.nodeTemplates.length ? project.nodeTemplates : defaultCompositeTemplates.map(cloneCompositeTemplate),
   };
 }
 

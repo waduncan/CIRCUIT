@@ -19,8 +19,6 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
   return (
     <>
       {project.nodes.map((node) => {
-        const inbound = node.ports.filter((port) => port.direction === "inbound");
-        const outbound = node.ports.filter((port) => port.direction === "outbound");
         const selected = selection?.type === "node" && selection.id === node.id;
         const inActiveProcess = Boolean(activeProcess?.checkpoints.includes(node.id) || activeRoute.some((edgeId) => {
           const edge = project.connections.find((item) => item.id === edgeId);
@@ -35,14 +33,28 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
             onPointerDown={(event) => onBeginNodeDrag(event, node)}
           >
             <div className="node-topline" />
-            <div className="node-header">
-              <div className="node-icon">{icons[node.kind]}</div>
-              <div><strong>{node.name}</strong><span>{primitiveLibrary.find((item) => item.kind === node.kind)?.name ?? "System"}</span></div>
+            <div className={`node-header ${node.composite ? "composite-header" : ""}`}>
+              <div className="node-icon">{node.composite?.logoText || icons[node.kind]}</div>
+              <div><strong>{node.name}</strong><span>{node.composite?.headerLabel || primitiveLibrary.find((item) => item.kind === node.kind)?.name || "System"}</span></div>
               <button aria-label={`More options for ${node.name}`}>•••</button>
             </div>
             <div className="capability-row">{node.capabilities.map((capability) => <span key={capability} style={{ "--cap": capabilityConfig[capability].color } as CSSProperties}>{capability}</span>)}</div>
-            <div className="port-column inbound">{inbound.map((port) => <button key={port.id} className={`port ${connecting ? "target-ready" : ""}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => onPortClick(node, port)} title={`${port.capability} ${port.subtype}`}><i style={{ "--port-color": capabilityConfig[port.capability].color } as CSSProperties} /><span>{port.name}</span></button>)}</div>
-            <div className="port-column outbound">{outbound.map((port) => <button key={port.id} className={`port ${connecting?.portId === port.id ? "source-active" : ""}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => onPortClick(node, port)} title={`${port.capability} ${port.subtype}`}><span>{port.name}</span><i style={{ "--port-color": capabilityConfig[port.capability].color } as CSSProperties} /></button>)}</div>
+            {node.composite && <div className="composite-body">
+              {node.composite.sections.map((section) => <section className={`composite-section ${section.kind}`} key={section.id}>
+                <h4>{section.title}</h4>
+                {section.kind === "fields" && <dl>{section.fields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.value || "—"}</dd></div>)}</dl>}
+                {section.kind === "endpoints" && <div className="composite-endpoints">{section.endpoints.map((endpoint) => <div key={endpoint.id}><strong>{endpoint.name}</strong><span>{endpoint.address}</span><small>{endpoint.details}</small></div>)}</div>}
+              </section>)}
+              {node.composite.footer && <footer>{node.composite.footer}</footer>}
+            </div>}
+            {node.ports.map((port) => {
+              const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
+              const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
+              const index = sameSide.findIndex((item) => item.id === port.id);
+              const position = `${((index + 1) / (sameSide.length + 1)) * 100}%`;
+              const style: CSSProperties & { "--port-color": string } = { "--port-color": capabilityConfig[port.capability].color, ...(side === "left" || side === "right" ? { top: position } : { left: position }) };
+              return <button key={port.id} className={`port node-port side-${side} ${connecting ? "target-ready" : ""} ${connecting?.portId === port.id ? "source-active" : ""}`} style={style} onPointerDown={(event) => event.stopPropagation()} onClick={() => onPortClick(node, port)} title={`${port.capability} ${port.subtype}`}><i /><span>{port.name}</span></button>;
+            })}
             {selected && <button className="resize-handle" onPointerDown={(event) => onBeginResize(event, node)} aria-label={`Resize ${node.name}`} />}
           </article>
         );
