@@ -19,7 +19,7 @@ import { useDiagramInteractions } from "./hooks/useDiagramInteractions";
 import { useContainerInteractions } from "./hooks/useContainerInteractions";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
 import { cloneCompositeContent, compositeLibraryItems } from "./model/compositeTemplates";
-import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap } from "./model/project";
+import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap, withConnectionDefaults } from "./model/project";
 import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
 import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, nodeBounds, unionBounds } from "./model/viewport";
 import { containerBounds } from "./model/containers";
@@ -44,11 +44,13 @@ export default function DiagramApp() {
   const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
   const allLibraryItems = useMemo(() => [...primitiveLibrary, ...compositeLibraryItems(project.nodeTemplates), ...project.customLibrary], [project.customLibrary, project.nodeTemplates]);
   const selectedNode = selection?.type === "node" ? project.nodes.find((node) => node.id === selection.id) : undefined;
   const selectedProcess = selection?.type === "process" ? project.processes.find((process) => process.id === selection.id) : undefined;
@@ -136,10 +138,9 @@ export default function DiagramApp() {
     }
     const duplicate = project.connections.some((edge) => edge.sourcePortId === sourcePort.id && edge.targetPortId === port.id);
     if (duplicate) { showToast("These ports are already connected."); setConnecting(null); return; }
-    const connection: Connection = {
-      id: createId("connection"), sourceNodeId: sourceNode.id, sourcePortId: sourcePort.id, targetNodeId: node.id, targetPortId: port.id,
+    const connection: Connection = withConnectionDefaults({ id: createId("connection"), sourceNodeId: sourceNode.id, sourcePortId: sourcePort.id, targetNodeId: node.id, targetPortId: port.id,
       capability: sourcePort.capability, subtype: connectionSubtype(sourcePort, port), dataType: "Unassigned data", description: "",
-    };
+    });
     dispatch({ type: "connection.add", connection });
     setConnecting(null);
     setSelection({ type: "connection", id: connection.id });
@@ -324,7 +325,7 @@ export default function DiagramApp() {
                   saveRoute(connection, orthogonalRoutePoints(routePoints[0], routePoints.at(-1)!, remaining));
                   showToast(`Bend point ${pointIndex + 1} removed.`);
                 }}
-              />
+                onUpdateConnection={updateConnection} />
               <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} />
             </div>
 

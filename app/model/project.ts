@@ -1,9 +1,12 @@
-import type { CanvasSettings, DiagramContainer, Port, Project, SystemNode } from "./types";
+import type { CanvasSettings, Connection, DiagramContainer, Port, Project, SystemNode } from "./types";
 import { cloneCompositeContent, cloneCompositeTemplate, defaultCompositeTemplates } from "./compositeTemplates";
 
 export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
 export const DEFAULT_CANVAS: CanvasSettings = { mode: "bounded", width: 2400, height: 1600 };
+export const defaultConnectionStyle = (): NonNullable<Connection["style"]> => ({ lineStyle: "solid", width: 2.4, opacity: 0.72, arrowStyle: "none" });
+export const defaultConnectionLabel = (connection: Pick<Connection, "capability" | "subtype">): NonNullable<Connection["labels"]>[number] => ({ id: createId("label"), text: `${connection.capability} · ${connection.subtype}`, anchor: "route", position: 0.5, offsetX: 0, offsetY: -14, background: true, rotation: 0 });
+export const withConnectionDefaults = (connection: Connection): Connection => ({ ...connection, style: connection.style ?? defaultConnectionStyle(), labels: connection.labels ?? [defaultConnectionLabel(connection)] });
 
 export const createId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
@@ -58,10 +61,10 @@ export function createDemoProject(): Project {
     containers,
     nodes,
     connections: [
-      { id: "c1", sourceNodeId: "emr-1", sourcePortId: "emr-orm-out", targetNodeId: "ie-1", targetPortId: "ie-orm-in", capability: "HL7", subtype: "ORM", dataType: "Cardiology order", description: "Outbound signed order" },
-      { id: "c2", sourceNodeId: "ie-1", sourcePortId: "ie-orm-out", targetNodeId: "app-1", targetPortId: "app-orm-in", capability: "HL7", subtype: "ORM", dataType: "Normalized order", description: "Transformed PACS order" },
-      { id: "c3", sourceNodeId: "app-1", sourcePortId: "app-mwl-out", targetNodeId: "cart-1", targetPortId: "cart-mwl-in", capability: "DICOM", subtype: "MWL", dataType: "Scheduled procedure", description: "Modality worklist query" },
-      { id: "c4", sourceNodeId: "cart-1", sourcePortId: "cart-store-out", targetNodeId: "app-1", targetPortId: "app-store-in", capability: "DICOM", subtype: "C-STORE", dataType: "Echo images", description: "Completed study images" },
+      withConnectionDefaults({ id: "c1", sourceNodeId: "emr-1", sourcePortId: "emr-orm-out", targetNodeId: "ie-1", targetPortId: "ie-orm-in", capability: "HL7", subtype: "ORM", dataType: "Cardiology order", description: "Outbound signed order" }),
+      withConnectionDefaults({ id: "c2", sourceNodeId: "ie-1", sourcePortId: "ie-orm-out", targetNodeId: "app-1", targetPortId: "app-orm-in", capability: "HL7", subtype: "ORM", dataType: "Normalized order", description: "Transformed PACS order" }),
+      withConnectionDefaults({ id: "c3", sourceNodeId: "app-1", sourcePortId: "app-mwl-out", targetNodeId: "cart-1", targetPortId: "cart-mwl-in", capability: "DICOM", subtype: "MWL", dataType: "Scheduled procedure", description: "Modality worklist query" }),
+      withConnectionDefaults({ id: "c4", sourceNodeId: "cart-1", sourcePortId: "cart-store-out", targetNodeId: "app-1", targetPortId: "app-store-in", capability: "DICOM", subtype: "C-STORE", dataType: "Echo images", description: "Completed study images" }),
     ],
     processes: [
       { id: "proc-order", name: "Order placement", description: "A signed cardiology order is routed from the EMR to the echo cart worklist.", checkpoints: ["emr-1", "cart-1"], color: "#2f6df6" },
@@ -152,7 +155,11 @@ export function migrateProjectDocument(value: unknown): Project | null {
       };
       return containerIds.has(node.containerId ?? "") ? normalized : { ...normalized, containerId: undefined };
     }),
-    connections: project.connections,
+    connections: project.connections.map((connection) => ({
+      ...connection,
+      style: { ...defaultConnectionStyle(), ...(connection.style ?? {}) },
+      labels: Array.isArray(connection.labels) ? connection.labels.map((label) => ({ ...label, id: label.id ?? createId("label"), anchor: label.anchor ?? "route", position: label.position ?? 0.5, offsetX: label.offsetX ?? 0, offsetY: label.offsetY ?? -14, background: label.background ?? true, rotation: label.rotation ?? 0 })) : [defaultConnectionLabel(connection)],
+    })),
     processes: project.processes,
     customLibrary: Array.isArray(project.customLibrary) ? project.customLibrary : [],
     nodeTemplates: Array.isArray(project.nodeTemplates) && project.nodeTemplates.length ? project.nodeTemplates : defaultCompositeTemplates.map(cloneCompositeTemplate),

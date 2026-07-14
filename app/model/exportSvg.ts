@@ -1,5 +1,5 @@
 import { capabilityConfig, icons, primitiveLibrary } from "./catalog";
-import { connectionRoute, portPosition, routeMidpoint, svgPath } from "./routing";
+import { connectionRoute, pointAlongRoute, portPosition, svgPath } from "./routing";
 import type { Capability, DiagramContainer, Project, SystemNode } from "./types";
 
 // Pure, dependency-free renderer that serialises a Project into a standalone SVG document.
@@ -53,9 +53,11 @@ export function diagramBounds(project: Project): Bounds {
   for (const connection of project.connections) {
     const route = connectionRoute(project, connection);
     for (const point of route) includePoint(bounds, point.x, point.y);
-    const mid = routeMidpoint(route);
-    includePoint(bounds, mid.x - 54, mid.y - 28);
-    includePoint(bounds, mid.x + 54, mid.y + 4);
+    for (const label of connection.labels ?? []) {
+      const anchor = pointAlongRoute(route, label.position, label.anchor === "segment" ? label.segmentIndex ?? 0 : undefined);
+      includePoint(bounds, anchor.x + label.offsetX - 70, anchor.y + label.offsetY - 18);
+      includePoint(bounds, anchor.x + label.offsetX + 70, anchor.y + label.offsetY + 18);
+    }
   }
   if (!Number.isFinite(bounds.minX)) return { minX: 0, minY: 0, maxX: 400, maxY: 300 };
   return bounds;
@@ -150,17 +152,19 @@ function renderConnection(project: Project, connectionId: string): string {
   const connection = project.connections.find((item) => item.id === connectionId)!;
   const route = connectionRoute(project, connection);
   const path = svgPath(route);
-  const color = capabilityConfig[connection.capability].color;
-  const mid = routeMidpoint(route);
-  const label = `${connection.capability} · ${connection.subtype}`;
-  const halfW = Math.max(52, label.length * 3.4 + 12);
-  return [
-    `<path d="${path}" fill="none" stroke="${esc(color)}" stroke-width="2.4" stroke-opacity="0.72" stroke-linecap="square" stroke-linejoin="round"/>`,
-    `<g transform="translate(${mid.x.toFixed(1)} ${(mid.y - 14).toFixed(1)})">`,
-    `<rect x="${(-halfW).toFixed(1)}" y="-12" width="${(halfW * 2).toFixed(1)}" height="24" rx="12" fill="#ffffff" fill-opacity="0.96" stroke="#dce4ea"/>`,
-    `<text x="0" y="0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#516578">${esc(label)}</text>`,
-    `</g>`,
-  ].join("");
+  const style = connection.style ?? { lineStyle: "solid", width: 2.4, opacity: .72, arrowStyle: "none" };
+  const color = style.color || capabilityConfig[connection.capability].color;
+  const dash = style.lineStyle === "dashed" ? ` stroke-dasharray="10 7"` : style.lineStyle === "dotted" ? ` stroke-dasharray="2 6"` : "";
+  const markers = `${style.arrowStyle === "start" || style.arrowStyle === "both" ? ` marker-start="url(#exportConnectionArrow)"` : ""}${style.arrowStyle === "end" || style.arrowStyle === "both" ? ` marker-end="url(#exportConnectionArrow)"` : ""}`;
+  const parts = [`<path d="${path}" fill="none" stroke="${esc(color)}" stroke-width="${style.width}" stroke-opacity="${style.opacity}" stroke-linecap="square" stroke-linejoin="round"${dash}${markers}/>`];
+  for (const label of connection.labels ?? []) {
+    const anchor = pointAlongRoute(route, label.position, label.anchor === "segment" ? label.segmentIndex ?? 0 : undefined);
+    const halfW = Math.max(24, label.text.length * 3.2 + 9);
+    parts.push(`<g transform="translate(${(anchor.x + label.offsetX).toFixed(1)} ${(anchor.y + label.offsetY).toFixed(1)}) rotate(${label.rotation})">`);
+    if (label.background) parts.push(`<rect x="${-halfW}" y="-12" width="${halfW * 2}" height="24" rx="6" fill="#ffffff" fill-opacity="0.96" stroke="#dce4ea"/>`);
+    parts.push(`<text x="0" y="0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#516578">${esc(label.text)}</text></g>`);
+  }
+  return parts.join("");
 }
 
 function renderLegend(project: Project, x: number, y: number, width: number): string {
@@ -209,6 +213,7 @@ export function exportDiagramSvg(project: Project, options: ExportSvgOptions = {
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" font-family="${FONT_STACK}">`,
+    `<defs><marker id="exportConnectionArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="context-stroke"/></marker></defs>`,
     layers.join("\n"),
     `</svg>`,
   ].join("\n");

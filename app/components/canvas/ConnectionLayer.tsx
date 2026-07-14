@@ -1,9 +1,9 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { capabilityConfig } from "../../model/catalog";
-import { connectionRoute, routeMidpoint, svgPath } from "../../model/routing";
+import { connectionRoute, pointAlongRoute, svgPath } from "../../model/routing";
 import { snap } from "../../model/project";
 import { boundsFromPoints, intersectsBounds } from "../../model/viewport";
-import type { Bounds, Connection, DataFlowProcess, Point, Project, Selection } from "../../model/types";
+import type { Bounds, Connection, ConnectionLabel, DataFlowProcess, Point, Project, Selection } from "../../model/types";
 
 type ConnectionLayerProps = {
   project: Project;
@@ -21,6 +21,7 @@ type ConnectionLayerProps = {
   onBeginBendDrag: (event: ReactPointerEvent<SVGCircleElement>, connection: Connection, pointIndex: number) => void;
   onBeginSegmentDrag: (event: ReactPointerEvent<SVGLineElement>, connection: Connection, segmentIndex: number, route: Point[]) => void;
   onRemoveBend: (connection: Connection, pointIndex: number, route: Point[]) => void;
+  onUpdateConnection: (connectionId: string, patch: Partial<Connection>, coalesceKey?: string) => void;
 };
 
 export function ConnectionLayer({
@@ -39,11 +40,13 @@ export function ConnectionLayer({
   onBeginBendDrag,
   onBeginSegmentDrag,
   onRemoveBend,
+  onUpdateConnection,
 }: ConnectionLayerProps) {
   return (
     <svg className="connection-layer" style={{ left: renderBounds.x, top: renderBounds.y, width: renderBounds.width, height: renderBounds.height }} viewBox={`${renderBounds.x} ${renderBounds.y} ${renderBounds.width} ${renderBounds.height}`} aria-label="System connections">
       <defs>
         <filter id="edgeGlow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        <marker id="connectionArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="context-stroke" /></marker>
       </defs>
       {project.connections.map((connection) => {
         const active = activeRoute.includes(connection.id);
@@ -51,8 +54,9 @@ export function ConnectionLayer({
         const routePoints = connectionRoute(project, connection);
         if (!selected && !active && !intersectsBounds(boundsFromPoints(routePoints), viewportBounds)) return null;
         const path = svgPath(routePoints);
-        const label = routeMidpoint(routePoints);
         const accent = activeProcess?.color ?? capabilityConfig[connection.capability].color;
+        const style = connection.style ?? { lineStyle: "solid", width: 2.4, opacity: 0.72, arrowStyle: "none" };
+        const labels = connection.labels ?? [];
         return (
           <g
             key={connection.id}
@@ -84,15 +88,30 @@ export function ConnectionLayer({
                 onSelect(connection.id);
               }}
             />
-            <path className="edge-line" d={path} style={{ "--edge-color": active ? accent : capabilityConfig[connection.capability].color } as CSSProperties} />
+            <path className="edge-line" d={path} markerStart={style.arrowStyle === "start" || style.arrowStyle === "both" ? "url(#connectionArrow)" : undefined} markerEnd={style.arrowStyle === "end" || style.arrowStyle === "both" ? "url(#connectionArrow)" : undefined} style={{ "--edge-color": active ? accent : (style.color || capabilityConfig[connection.capability].color), "--edge-width": style.width, "--edge-opacity": style.opacity, "--edge-dash": style.lineStyle === "dashed" ? "10 7" : style.lineStyle === "dotted" ? "2 6" : "none" } as CSSProperties} />
             {selected && routePoints.slice(1).map((point, segmentIndex) => {
               const start = routePoints[segmentIndex];
               return <line key={`${connection.id}-segment-${segmentIndex}`} className={`edge-segment-hit ${start.y === point.y ? "horizontal" : "vertical"}`} x1={start.x} y1={start.y} x2={point.x} y2={point.y} onPointerDown={(event) => onBeginSegmentDrag(event, connection, segmentIndex, routePoints)} />;
             })}
-            <g className="edge-label" transform={`translate(${label.x} ${label.y - 14})`}>
-              <rect x="-52" y="-12" width="104" height="24" rx="12" />
-              <text textAnchor="middle" dominantBaseline="middle">{connection.capability} · {connection.subtype}</text>
-            </g>
+            {labels.map((connectionLabel: ConnectionLabel) => {
+              const anchor = pointAlongRoute(routePoints, connectionLabel.position, connectionLabel.anchor === "segment" ? connectionLabel.segmentIndex ?? 0 : undefined);
+              const x = anchor.x + connectionLabel.offsetX;
+              const y = anchor.y + connectionLabel.offsetY;
+              const halfWidth = Math.max(24, connectionLabel.text.length * 3.2 + 9);
+              return <g key={connectionLabel.id} className={`edge-label ${selected ? "editable" : ""}`} transform={`translate(${x} ${y}) rotate(${connectionLabel.rotation})`} onPointerDown={(event) => {
+                if (!selected) return;
+                event.preventDefault(); event.stopPropagation();
+                const startX = event.clientX; const startY = event.clientY;
+                const startOffset = { x: connectionLabel.offsetX, y: connectionLabel.offsetY };
+                const gestureKey = `connection-label:${connectionLabel.id}`;
+                const move = (moveEvent: PointerEvent) => onUpdateConnection(connection.id, { labels: labels.map((item) => item.id === connectionLabel.id ? { ...item, offsetX: startOffset.x + (moveEvent.clientX - startX) / zoom, offsetY: startOffset.y + (moveEvent.clientY - startY) / zoom } : item) }, gestureKey);
+                const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+                window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+              }}>
+                {connectionLabel.background && <rect x={-halfWidth} y="-12" width={halfWidth * 2} height="24" rx="6" />}
+                <text textAnchor="middle" dominantBaseline="middle">{connectionLabel.text}</text>
+              </g>;
+            })}
             {selected && routePoints.slice(1, -1).map((point, pointIndex) => (
               <circle
                 key={`${connection.id}-bend-${pointIndex}`}
