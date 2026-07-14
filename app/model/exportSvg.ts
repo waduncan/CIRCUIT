@@ -70,14 +70,14 @@ function renderContainer(container: DiagramContainer): string {
 }
 
 function renderNode(node: SystemNode): string {
-  const subtitle = primitiveLibrary.find((item) => item.kind === node.kind)?.name ?? "System";
+  const subtitle = node.composite?.headerLabel || primitiveLibrary.find((item) => item.kind === node.kind)?.name || "System";
   const parts: string[] = [];
   // Card + accent topline.
   parts.push(`<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="10" fill="#ffffff" stroke="#ccd7e0"/>`);
   parts.push(`<rect x="${node.x + 10}" y="${node.y}" width="${node.width - 20}" height="4" rx="1.5" fill="${esc(node.color)}"/>`);
   // Header: icon tile, name, subtitle.
   parts.push(`<rect x="${node.x + 12}" y="${node.y + 12}" width="38" height="38" rx="9" fill="${esc(node.color)}" fill-opacity="0.10" stroke="${esc(node.color)}" stroke-opacity="0.25"/>`);
-  parts.push(`<text x="${node.x + 31}" y="${node.y + 37}" font-size="17" text-anchor="middle" fill="${esc(node.color)}">${esc(icons[node.kind])}</text>`);
+  parts.push(`<text x="${node.x + 31}" y="${node.y + 37}" font-size="${node.composite ? 10 : 17}" font-weight="700" text-anchor="middle" fill="${esc(node.color)}">${esc(node.composite?.logoText || icons[node.kind])}</text>`);
   const textLeft = node.x + 59;
   const nameWidth = node.width - 59 - 16;
   parts.push(`<text x="${textLeft}" y="${node.y + 31}" font-size="12" font-weight="700" fill="#1f2d3a">${esc(truncate(node.name, nameWidth, 12))}</text>`);
@@ -94,17 +94,53 @@ function renderNode(node: SystemNode): string {
     chipX += chipW + 4;
   }
   parts.push(`<line x1="${node.x + 12}" y1="${node.y + 80}" x2="${node.x + node.width - 12}" y2="${node.y + 80}" stroke="#edf1f4"/>`);
+  if (node.composite) {
+    let contentY = node.y + 99;
+    const contentBottom = node.y + node.height - (node.composite.footer ? 24 : 8);
+    for (const section of node.composite.sections) {
+      if (contentY + 18 > contentBottom) break;
+      parts.push(`<text x="${node.x + 12}" y="${contentY}" font-size="10" font-weight="800" letter-spacing="0.4" fill="${esc(node.color)}">${esc(section.title.toUpperCase())}</text>`);
+      contentY += 14;
+      if (section.kind === "fields") {
+        const columnWidth = (node.width - 30) / 2;
+        section.fields.forEach((field, index) => {
+          const column = index % 2;
+          const row = Math.floor(index / 2);
+          const x = node.x + 12 + column * (columnWidth + 6);
+          const y = contentY + row * 27;
+          if (y + 20 > contentBottom) return;
+          parts.push(`<text x="${x}" y="${y}" font-size="10" fill="#83919f">${esc(truncate(field.label, columnWidth, 10))}</text>`);
+          parts.push(`<text x="${x}" y="${y + 12}" font-size="10" font-weight="700" fill="#30465b">${esc(truncate(field.value || "—", columnWidth, 10))}</text>`);
+        });
+        contentY += Math.ceil(section.fields.length / 2) * 27 + 5;
+      } else {
+        for (const endpoint of section.endpoints) {
+          if (contentY + 21 > contentBottom) break;
+          parts.push(`<rect x="${node.x + 12}" y="${contentY - 10}" width="${node.width - 24}" height="20" rx="4" fill="#f8fafc" stroke="#e3e9ee"/>`);
+          parts.push(`<text x="${node.x + 18}" y="${contentY + 4}" font-size="10" font-weight="700" fill="#30465b">${esc(truncate(endpoint.name, 70, 10))}</text>`);
+          parts.push(`<text x="${node.x + 94}" y="${contentY + 4}" font-size="10" fill="#425b73">${esc(truncate(endpoint.address, 94, 10))}</text>`);
+          parts.push(`<text x="${node.x + node.width - 12}" y="${contentY + 4}" font-size="10" text-anchor="end" fill="#8493a1">${esc(truncate(endpoint.details, 72, 10))}</text>`);
+          contentY += 23;
+        }
+      }
+    }
+    if (node.composite.footer) {
+      parts.push(`<rect x="${node.x}" y="${node.y + node.height - 22}" width="${node.width}" height="22" rx="0" fill="${esc(node.color)}" fill-opacity="0.06"/>`);
+      parts.push(`<text x="${node.x + 12}" y="${node.y + node.height - 7}" font-size="10" font-weight="700" fill="#6f8192">${esc(truncate(node.composite.footer, node.width - 24, 10))}</text>`);
+    }
+  }
   // Ports: dot on the node edge, label pill just inside.
   const project = { nodes: [node] };
   for (const port of node.ports) {
     const pos = portPosition(project, node.id, port.id);
     const color = capabilityConfig[port.capability].color;
-    const inbound = port.direction === "inbound";
-    const label = truncate(port.name, 78, 10);
+    const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
+    const label = truncate(port.name, 88, 10);
     const pillW = label.length * 6.2 + 10;
-    const pillX = inbound ? node.x + 8 : node.x + node.width - 8 - pillW;
-    parts.push(`<rect x="${pillX.toFixed(1)}" y="${(pos.y - 10).toFixed(1)}" width="${pillW.toFixed(1)}" height="20" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
-    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pos.y + 4).toFixed(1)}" font-size="10" fill="#66798c">${esc(label)}</text>`);
+    const pillX = side === "left" ? node.x + 8 : side === "right" ? node.x + node.width - 8 - pillW : Math.max(node.x + 4, Math.min(pos.x - pillW / 2, node.x + node.width - pillW - 4));
+    const pillY = side === "top" ? node.y + 8 : side === "bottom" ? node.y + node.height - 28 : pos.y - 10;
+    parts.push(`<rect x="${pillX.toFixed(1)}" y="${pillY.toFixed(1)}" width="${pillW.toFixed(1)}" height="20" rx="5" fill="#ffffff" stroke="#e0e6eb"/>`);
+    parts.push(`<text x="${(pillX + 5).toFixed(1)}" y="${(pillY + 14).toFixed(1)}" font-size="10" fill="#66798c">${esc(label)}</text>`);
     parts.push(`<circle cx="${pos.x}" cy="${pos.y}" r="6" fill="${esc(color)}" stroke="#ffffff" stroke-width="2"/>`);
   }
   return parts.join("");

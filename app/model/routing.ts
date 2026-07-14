@@ -53,9 +53,13 @@ export function portPosition(project: Pick<Project, "nodes">, nodeId: string, po
   if (!node) return { x: 0, y: 0 };
   const port = node.ports.find((item) => item.id === portId);
   if (!port) return { x: node.x, y: node.y };
-  const sameDirection = node.ports.filter((item) => item.direction === port.direction);
-  const index = sameDirection.findIndex((item) => item.id === portId);
-  return { x: port.direction === "inbound" ? node.x : node.x + node.width, y: node.y + 82 + index * 34 };
+  const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
+  const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
+  const index = sameSide.findIndex((item) => item.id === portId);
+  const ratio = (index + 1) / (sameSide.length + 1);
+  if (side === "top") return { x: node.x + node.width * ratio, y: node.y };
+  if (side === "bottom") return { x: node.x + node.width * ratio, y: node.y + node.height };
+  return { x: side === "left" ? node.x : node.x + node.width, y: node.y + node.height * ratio };
 }
 
 export function connectionRoute(project: Pick<Project, "nodes">, connection: Connection): Point[] {

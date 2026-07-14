@@ -18,13 +18,13 @@ import { useEditorInteraction } from "./hooks/useEditorInteraction";
 import { useDiagramInteractions } from "./hooks/useDiagramInteractions";
 import { useContainerInteractions } from "./hooks/useContainerInteractions";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
+import { cloneCompositeContent, compositeLibraryItems } from "./model/compositeTemplates";
 import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap } from "./model/project";
 import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
 import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, nodeBounds, unionBounds } from "./model/viewport";
 import { containerBounds } from "./model/containers";
 import type { Bounds, Connection, DataFlowProcess as Process, DiagramContainer, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
 import { downloadJson } from "./utils/download";
-
 export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
   const { selection, setSelection, connecting, setConnecting, modifierKeys } = useEditorInteraction();
@@ -41,17 +41,15 @@ export default function DiagramApp() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateKind, setNewTemplateKind] = useState<PrimitiveKind>("application");
-  const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "" });
+  const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
-  const allLibraryItems = useMemo(() => [...primitiveLibrary, ...project.customLibrary], [project.customLibrary]);
+  const allLibraryItems = useMemo(() => [...primitiveLibrary, ...compositeLibraryItems(project.nodeTemplates), ...project.customLibrary], [project.customLibrary, project.nodeTemplates]);
   const selectedNode = selection?.type === "node" ? project.nodes.find((node) => node.id === selection.id) : undefined;
   const selectedProcess = selection?.type === "process" ? project.processes.find((process) => process.id === selection.id) : undefined;
   const activeProcess = project.processes.find((process) => process.id === activeProcessId);
@@ -85,15 +83,12 @@ export default function DiagramApp() {
     const capability = selectedNode.capabilities[0];
     setPortDraft((current) => ({ ...current, capability, subtype: capabilityConfig[capability].subtypes[0] }));
   }, [selectedNode, portDraft.capability]);
-
   const updateNode = useCallback((nodeId: string, patch: Partial<SystemNode>, coalesceKey?: string) => {
     dispatch({ type: "node.update", id: nodeId, patch }, coalesceKey);
   }, [dispatch]);
-
   const updateContainer = useCallback((containerId: string, patch: Partial<DiagramContainer>, coalesceKey?: string) => {
     dispatch({ type: "container.update", id: containerId, patch }, coalesceKey);
   }, [dispatch]);
-
   const updateConnection = useCallback((connectionId: string, patch: Partial<Connection>, coalesceKey?: string) => {
     dispatch({ type: "connection.update", id: connectionId, patch }, coalesceKey);
   }, [dispatch]);
@@ -152,7 +147,8 @@ export default function DiagramApp() {
   };
 
   const addNodeFromLibrary = (item: LibraryItem, x = 480, y = 360) => {
-    const node: SystemNode = { id: createId("node"), name: item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: 224, height: 176, color: item.color, capabilities: [...item.capabilities], ports: [] };
+    const template = item.templateId ? project.nodeTemplates.find((entry) => entry.id === item.templateId) : undefined;
+    const node: SystemNode = { id: createId("node"), name: item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: template?.defaultWidth ?? 224, height: template?.defaultHeight ?? 176, color: item.color, capabilities: [...item.capabilities], ports: [], composite: template ? cloneCompositeContent(template) : undefined };
     dispatch({ type: "node.add", node });
     setSelection({ type: "node", id: node.id });
     showToast(`${node.name} added. Add ports from Properties.`);
@@ -191,6 +187,28 @@ export default function DiagramApp() {
     dispatch({ type: "selection.delete", selection });
     setSelection(null);
     showToast("Removed from the project.");
+  };
+
+  const duplicateNode = (node: SystemNode) => {
+    const duplicate: SystemNode = {
+      ...node,
+      id: createId("node"),
+      name: `${node.name} copy`,
+      x: snap(node.x + 32),
+      y: snap(node.y + 32),
+      ports: node.ports.map((port) => ({ ...port, id: createId("port") })),
+      composite: node.composite ? {
+        ...node.composite,
+        sections: node.composite.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) => ({ ...field, id: createId("field") })),
+          endpoints: section.endpoints.map((endpoint) => ({ ...endpoint, id: createId("endpoint") })),
+        })),
+      } : undefined,
+    };
+    dispatch({ type: "node.add", node: duplicate });
+    setSelection({ type: "node", id: duplicate.id });
+    showToast(`${duplicate.name} created.`);
   };
 
   const importProject = async (file: File) => {
@@ -350,6 +368,7 @@ export default function DiagramApp() {
           setPortDraft={setPortDraft}
           onDelete={removeSelected}
           onAddPort={addPort}
+          onDuplicateNode={duplicateNode}
           onAddCheckpoint={addCheckpoint}
           onActivateProcess={(processId) => { setActiveProcessId(processId); setIsAnimating(true); }}
           onUpdateNode={updateNode}
