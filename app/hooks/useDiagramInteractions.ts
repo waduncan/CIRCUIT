@@ -139,6 +139,7 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
   const beginPortDrag = (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest(".port-resize-handle")) return;
     event.stopPropagation();
+    setSelection({ type: "node", id: node.id });
     const element = event.currentTarget;
     const startX = event.clientX; const startY = event.clientY;
     const origin = portTilePosition({ nodes: [node] }, node.id, port.id);

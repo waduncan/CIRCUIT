@@ -23,8 +23,10 @@ test("supports dragging and resizing port tiles independently of connection sema
   ]);
   assert.match(hook, /beginPortDrag/);
   assert.match(hook, /beginPortResize/);
+  assert.match(hook, /setSelection\(\{ type: "node", id: node\.id \}\)/);
   assert.match(hook, /PortSide/);
   assert.match(layer, /port-resize-handle/);
+  assert.match(layer, /dataset\.selectOnly/);
   assert.match(layer, /secondaryIdentifier/);
   assert.match(inspector, /semantics remain independent of edge placement/);
 });
