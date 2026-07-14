@@ -1,6 +1,6 @@
 # CIRCUIT
 
-## Clinical Interface Routing, Connectivity, and Unified Integration Tool
+### Clinical Interface Routing, Connectivity, and Unified Integration Tool
 
 ## Why this was made 
 Working in Healthcare IT, you end up making a lot of visio diagrams; usually those diagrams are complicated 
