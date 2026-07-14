@@ -20,7 +20,7 @@ type SystemNodeLayerProps = {
 export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
   return (
     <>
-      {project.nodes.map((node) => {
+      {[...project.nodes].sort((a, b) => (a.kind === "nestable" ? -1 : 0) - (b.kind === "nestable" ? -1 : 0)).map((node) => {
         const selected = selection?.type === "node" && selection.id === node.id;
         const inActiveProcess = Boolean(activeProcess?.checkpoints.includes(node.id) || activeRoute.some((edgeId) => {
           const edge = project.connections.find((item) => item.id === edgeId);
@@ -30,11 +30,12 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
         return (
           <article
             key={node.id}
-            className={`system-node ${selected ? "selected" : ""} ${inActiveProcess ? "process-node" : ""}`}
+            className={`system-node ${node.kind === "nestable" ? "nested-node" : ""} ${node.nestedParentId ? "nested-child" : ""} ${project.presentation === "clean" ? "clean-view" : "detailed-view"} ${selected ? "selected" : ""} ${inActiveProcess ? "process-node" : ""}`}
             style={{ left: node.x, top: node.y, width: node.width, height: node.height, "--node-accent": node.color, "--process-accent": activeProcess?.color ?? node.color } as CSSProperties}
             onPointerDown={(event) => onBeginNodeDrag(event, node)}
           >
             <div className="node-topline" />
+            {node.kind === "nestable" ? <div className="nested-node-header"><span>Nested group</span><strong>{node.name}</strong><small>{project.nodes.filter((item) => item.nestedParentId === node.id).length} contained systems · shared external ports</small></div> : project.presentation === "clean" ? <div className="clean-node-body"><strong>{node.name}</strong></div> : <>
             <div className={`node-header ${node.composite ? "composite-header" : ""}`}>
               <div className="node-icon">{node.composite?.logoText || icons[node.kind]}</div>
               <div><strong>{node.name}</strong><span>{node.composite?.headerLabel || primitiveLibrary.find((item) => item.kind === node.kind)?.name || "System"}</span></div>
@@ -48,8 +49,8 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
                 {section.kind === "endpoints" && <div className="composite-endpoints">{section.endpoints.map((endpoint) => <div key={endpoint.id}><strong>{endpoint.name}</strong><span>{endpoint.address}</span><small>{endpoint.details}</small></div>)}</div>}
               </section>)}
               {node.composite.footer && <footer>{node.composite.footer}</footer>}
-            </div>}
-            {node.ports.map((port) => {
+            </div>}</>}
+            {node.ports.filter((port) => !node.nestedParentId || project.connections.some((connection) => connection.sourcePortId === port.id || connection.targetPortId === port.id)).map((port) => {
               const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
               const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
               const index = sameSide.findIndex((item) => item.id === port.id);
