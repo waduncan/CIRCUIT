@@ -15,6 +15,7 @@ export const primitiveLibrary: LibraryItem[] = [
   { id: "database", name: "Database Server", kind: "database", description: "Stores application and clinical data", color: "#e67e22", capabilities: ["TCP", "General Data"] },
   { id: "device", name: "Clinical Device", kind: "device", description: "Modality, cart, or bedside device", color: "#d14d72", capabilities: ["DICOM", "HL7", "General Data"] },
   { id: "cloud", name: "External Service", kind: "cloud", description: "Cloud or third-party endpoint", color: "#5a7184", capabilities: ["FHIR", "TCP", "General Data"] },
+  { id: "nestable", name: "Nestable Container", kind: "nestable", description: "Container for grouping nodes with shared external ports", color: "#64748b", capabilities: ["HL7", "FHIR", "DICOM", "TCP", "General Data"] },
 ];
 
 export const icons: Record<PrimitiveKind, string> = {
@@ -24,4 +25,5 @@ export const icons: Record<PrimitiveKind, string> = {
   database: "◉",
   device: "⌁",
   cloud: "☁",
+  nestable: "▤",
 };

@@ -1,5 +1,6 @@
 import type { CanvasSettings, Connection, DiagramContainer, Port, Project, SystemNode } from "./types";
 import { cloneCompositeContent, cloneCompositeTemplate, defaultCompositeTemplates } from "./compositeTemplates";
+import { reconcileNestedNodes } from "./nesting";
 
 export const GRID = 16;
 export const STORAGE_KEY = "careflow-studio-project-v1";
@@ -55,7 +56,7 @@ export function createDemoProject(): Project {
     version: 1,
     id: "pacs-logical",
     name: "Cardiology PACS Connectivity",
-    description: "Logical integration map for cardiology ordering, modality worklist, and image acquisition.",
+    description: "Logical integration map for cardiology ordering, modality worklist, and image acquisition.", presentation: "detailed",
     updatedAt: new Date().toISOString(),
     canvas: { ...DEFAULT_CANVAS },
     containers,
@@ -76,7 +77,7 @@ export function createDemoProject(): Project {
 }
 
 export function blankProject(name: string, description: string): Project {
-  return { version: 1, id: createId("project"), name, description, updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, containers: [], nodes: [], connections: [], processes: [], customLibrary: [], nodeTemplates: defaultCompositeTemplates.map(cloneCompositeTemplate) };
+  return { version: 1, id: createId("project"), name, description, presentation: "detailed", updatedAt: new Date().toISOString(), canvas: { ...DEFAULT_CANVAS }, containers: [], nodes: [], connections: [], processes: [], customLibrary: [], nodeTemplates: defaultCompositeTemplates.map(cloneCompositeTemplate) };
 }
 
 export function calculateProcessRoute(project: Project, checkpoints: string[]): string[] {
@@ -141,6 +142,7 @@ export function migrateProjectDocument(value: unknown): Project | null {
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
+    presentation: project.presentation === "clean" ? "clean" : "detailed",
     updatedAt: project.updatedAt ?? new Date().toISOString(),
     canvas: {
       mode: project.canvas?.mode === "infinite" ? "infinite" : "bounded",
@@ -148,7 +150,7 @@ export function migrateProjectDocument(value: unknown): Project | null {
       height: Math.max(480, Number(project.canvas?.height) || DEFAULT_CANVAS.height),
     },
     containers,
-    nodes: project.nodes.map((node) => {
+    nodes: reconcileNestedNodes(project.nodes.map((node) => {
       const rawPorts = Array.isArray(node.ports) ? node.ports : [];
       const normalized = {
         ...node,
@@ -160,7 +162,7 @@ export function migrateProjectDocument(value: unknown): Project | null {
         }),
       };
       return containerIds.has(node.containerId ?? "") ? normalized : { ...normalized, containerId: undefined };
-    }),
+    })),
     connections: project.connections.map((connection) => ({
       ...connection,
       style: { ...defaultConnectionStyle(), ...(connection.style ?? {}) },

@@ -1,4 +1,5 @@
 import { containerForNode, reconcileNodeContainers } from "./containers";
+import { reconcileNestedNodes } from "./nesting";
 import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Project, Selection, SystemNode } from "./types";
 
 export type ProjectCommand =
@@ -14,19 +15,26 @@ export type ProjectCommand =
   | { type: "library.remove"; id: string }
   | { type: "library.replace"; items: LibraryItem[] }
   | { type: "canvas.update"; patch: Partial<CanvasSettings> }
+  | { type: "presentation.update"; presentation: Project["presentation"] }
   | { type: "selection.delete"; selection: Exclude<Selection, null> };
 
 export function applyProjectCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
     case "node.add":
-      return { ...project, nodes: [...project.nodes, { ...command.node, containerId: containerForNode(command.node, project.containers) }] };
-    case "node.update":
-      return { ...project, nodes: project.nodes.map((node) => {
+      return { ...project, nodes: reconcileNestedNodes([...project.nodes, { ...command.node, containerId: containerForNode(command.node, project.containers) }]) };
+    case "node.update": {
+      const updated = project.nodes.map((node) => {
         if (node.id !== command.id) return node;
-        const updated = { ...node, ...command.patch };
+        const nextNode = { ...node, ...command.patch };
         const geometryChanged = "x" in command.patch || "y" in command.patch || "width" in command.patch || "height" in command.patch;
-        return geometryChanged ? { ...updated, containerId: containerForNode(updated, project.containers) } : updated;
-      }) };
+        return geometryChanged ? { ...nextNode, containerId: containerForNode(nextNode, project.containers) } : nextNode;
+      });
+      const movedParent = project.nodes.find((node) => node.id === command.id && node.kind === "nestable");
+      const dx = movedParent && typeof command.patch.x === "number" ? command.patch.x - movedParent.x : 0;
+      const dy = movedParent && typeof command.patch.y === "number" ? command.patch.y - movedParent.y : 0;
+      const movedNodes = updated.map((node) => node.nestedParentId === command.id && (dx || dy) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
+      return { ...project, nodes: reconcileNestedNodes(movedNodes) };
+    }
     case "container.add": {
       const containers = [...project.containers, command.container];
       return { ...project, containers, nodes: reconcileNodeContainers(project.nodes, containers) };
@@ -52,6 +60,8 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
       return { ...project, customLibrary: command.items };
     case "canvas.update":
       return { ...project, canvas: { ...project.canvas, ...command.patch } };
+    case "presentation.update":
+      return { ...project, presentation: command.presentation };
     case "selection.delete":
       if (command.selection.type === "container") {
         return { ...project, containers: project.containers.filter((container) => container.id !== command.selection.id), nodes: project.nodes.map((node) => node.containerId === command.selection.id ? { ...node, containerId: undefined } : node) };

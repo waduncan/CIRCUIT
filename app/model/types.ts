@@ -1,7 +1,7 @@
 export type Capability = "HL7" | "FHIR" | "DICOM" | "TCP" | "General Data";
 export type Direction = "inbound" | "outbound";
 export type PortSide = "left" | "right" | "top" | "bottom";
-export type PrimitiveKind = "emr" | "interface" | "application" | "database" | "device" | "cloud";
+export type PrimitiveKind = "emr" | "interface" | "application" | "database" | "device" | "cloud"| "nestable";
 
 export type Point = {
   x: number;
@@ -76,6 +76,7 @@ export type SystemNode = {
   capabilities: Capability[];
   ports: Port[];
   containerId?: string;
+  nestedParentId?: string;
   composite?: CompositeNodeContent;
 };
 
@@ -166,6 +167,7 @@ export type Project = {
   id: string;
   name: string;
   description: string;
+  presentation: "detailed" | "clean";
   updatedAt: string;
   canvas: CanvasSettings;
   containers: DiagramContainer[];

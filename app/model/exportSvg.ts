@@ -76,12 +76,19 @@ function renderContainer(container: DiagramContainer): string {
   ].join("");
 }
 
-function renderNode(node: SystemNode): string {
+function renderNode(node: SystemNode, project: Project): string {
+  const presentation = project.presentation;
   const subtitle = node.composite?.headerLabel || primitiveLibrary.find((item) => item.kind === node.kind)?.name || "System";
   const parts: string[] = [];
   // Card + accent topline.
-  parts.push(`<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="10" fill="#ffffff" stroke="#ccd7e0"/>`);
+  parts.push(node.kind === "nestable" ? `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="8" fill="${esc(node.color)}" fill-opacity="0.05" stroke="${esc(node.color)}" stroke-width="2"/>` : presentation === "clean" ? `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="10" fill="${esc(node.color)}" fill-opacity="0.07" stroke="${esc(node.color)}" stroke-opacity="0.38"/>` : `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="10" fill="#ffffff" stroke="#ccd7e0"/>`);
   parts.push(`<rect x="${node.x + 10}" y="${node.y}" width="${node.width - 20}" height="4" rx="1.5" fill="${esc(node.color)}"/>`);
+  if (node.kind === "nestable") {
+    parts.push(`<rect x="${node.x}" y="${node.y}" width="${node.width}" height="36" fill="${esc(node.color)}" fill-opacity="0.12"/>`);
+    parts.push(`<text x="${node.x + 12}" y="${node.y + 22}" font-size="12" font-weight="700" fill="#405468">${esc(truncate(node.name, node.width - 24, 12))}</text>`);
+  } else if (presentation === "clean") {
+    parts.push(`<text x="${node.x + node.width / 2}" y="${node.y + node.height / 2}" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#30465b">${esc(truncate(node.name, node.width - 40, 14))}</text>`);
+  } else {
   // Header: icon tile, name, subtitle.
   parts.push(`<rect x="${node.x + 12}" y="${node.y + 12}" width="38" height="38" rx="9" fill="${esc(node.color)}" fill-opacity="0.10" stroke="${esc(node.color)}" stroke-opacity="0.25"/>`);
   parts.push(`<text x="${node.x + 31}" y="${node.y + 37}" font-size="${node.composite ? 10 : 17}" font-weight="700" text-anchor="middle" fill="${esc(node.color)}">${esc(node.composite?.logoText || icons[node.kind])}</text>`);
@@ -136,10 +143,11 @@ function renderNode(node: SystemNode): string {
       parts.push(`<text x="${node.x + 12}" y="${node.y + node.height - 7}" font-size="10" font-weight="700" fill="#6f8192">${esc(truncate(node.composite.footer, node.width - 24, 10))}</text>`);
     }
   }
+  }
   // Port tiles straddle the node boundary; the connection anchor sits on the outside edge.
-  const project = { nodes: [node] };
-  for (const port of node.ports) {
-    const pos = portTilePosition(project, node.id, port.id);
+  const localProject = { nodes: [node] };
+  for (const port of node.ports.filter((port) => !node.nestedParentId || project.connections.some((connection) => connection.sourcePortId === port.id || connection.targetPortId === port.id))) {
+    const pos = portTilePosition(localProject, node.id, port.id);
     const color = capabilityConfig[port.capability].color;
     const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
     const width = port.width ?? 92; const height = port.height ?? 34;
@@ -214,7 +222,7 @@ export function exportDiagramSvg(project: Project, options: ExportSvgOptions = {
   layers.push(`<g transform="translate(${offsetX} ${offsetY})">`);
   for (const container of project.containers) layers.push(renderContainer(container));
   for (const connection of project.connections) layers.push(renderConnection(project, connection.id));
-  for (const node of project.nodes) layers.push(renderNode(node));
+  for (const node of [...project.nodes].sort((a, b) => (a.kind === "nestable" ? -1 : 0) - (b.kind === "nestable" ? -1 : 0))) layers.push(renderNode(node, project));
   layers.push(`</g>`);
   if (includeLegend) layers.push(renderLegend(project, padding, totalH - padding - LEGEND_ROW, totalW - padding * 2));
 

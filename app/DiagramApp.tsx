@@ -8,7 +8,7 @@ import {
 } from "react";
 import { ExportDialog } from "./components/ExportDialog";
 import { CanvasToolbar } from "./components/CanvasToolbar";
-import { PropertiesInspector } from "./components/PropertiesInspector";
+import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { ContainerLayer } from "./components/canvas/ContainerLayer";
 import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer";
@@ -149,7 +149,7 @@ export default function DiagramApp() {
 
   const addNodeFromLibrary = (item: LibraryItem, x = 480, y = 360) => {
     const template = item.templateId ? project.nodeTemplates.find((entry) => entry.id === item.templateId) : undefined;
-    const node: SystemNode = { id: createId("node"), name: item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: template?.defaultWidth ?? 224, height: template?.defaultHeight ?? 176, color: item.color, capabilities: [...item.capabilities], ports: [], composite: template ? cloneCompositeContent(template) : undefined };
+    const nested = item.kind === "nestable", node: SystemNode = { id: createId("node"), name: nested ? "Modality group" : item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: nested ? 560 : template?.defaultWidth ?? 224, height: nested ? 400 : template?.defaultHeight ?? 176, color: item.color, capabilities: [...item.capabilities], ports: [], composite: template ? cloneCompositeContent(template) : undefined };
     dispatch({ type: "node.add", node });
     setSelection({ type: "node", id: node.id });
     showToast(`${node.name} added. Add ports from Properties.`);
@@ -262,7 +262,7 @@ export default function DiagramApp() {
         <div className="project-divider" />
         <button className="project-title-button" onClick={() => setNewProjectOpen(true)} aria-label="Project options">
           <span>{project.name}</span><small>Saved locally · {project.nodes.length} systems</small>
-        </button>
+        </button><label className="presentation-toggle"><span>Clean</span><Switch checked={project.presentation === "detailed"} onCheckedChange={(checked) => dispatch({ type: "presentation.update", presentation: checked ? "detailed" : "clean" })} aria-label="Toggle detailed object view" /><span>Detailed</span></label>
         <div className="topbar-actions">
           <button className="button ghost" onClick={() => fileInputRef.current?.click()}>Open JSON</button>
           <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importProject(event.target.files[0])} />
