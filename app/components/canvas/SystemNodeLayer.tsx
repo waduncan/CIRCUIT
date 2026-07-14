@@ -28,7 +28,20 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
           return edge?.sourceNodeId === node.id || edge?.targetNodeId === node.id;
         }));
         if (!selected && !inActiveProcess && !intersectsBounds(nodeBounds(node), viewportBounds)) return null;
-        return <SystemNodeRenderer key={node.id} project={project} node={node} selected={selected} inActiveProcess={inActiveProcess} connecting={connecting} activeProcess={activeProcess} onBeginNodeDrag={onBeginNodeDrag} onBeginResize={onBeginResize} onPortClick={onPortClick} onBeginPortDrag={onBeginPortDrag} onBeginPortResize={onBeginPortResize} />;
+        return <SystemNodeRenderer 
+                key={node.id} 
+                project={project} 
+                node={node} 
+                selected={selected} 
+                inActiveProcess={inActiveProcess} 
+                connecting={connecting} 
+                activeProcess={activeProcess} 
+                onBeginNodeDrag={onBeginNodeDrag} 
+                onBeginResize={onBeginResize} 
+                onPortClick={onPortClick} 
+                onBeginPortDrag={onBeginPortDrag} 
+                onBeginPortResize={onBeginPortResize} 
+                />;
       })}
       {!project.nodes.length && <div className="empty-canvas"><div>＋</div><h2>Build your connectivity map</h2><p>Drag a healthcare primitive from the object library to begin.</p></div>}
     </>
