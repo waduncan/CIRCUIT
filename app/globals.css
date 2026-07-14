@@ -143,6 +143,28 @@ button { color: inherit; }
 .port span { background: rgba(255,255,255,.95); border: 1px solid #e0e6eb; border-radius: 5px; padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .port i { width: 12px; height: 12px; min-width: 12px; border-radius: 50%; display: block; background: var(--port-color); border: 3px solid #fff; box-shadow: 0 0 0 1.5px var(--port-color); transition: .15s ease; }
 .port:hover i, .port.target-ready:hover i, .port.source-active i { transform: scale(1.35); box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color) 24%, transparent); }
+.node-port { position: absolute; z-index: 3; max-width: 112px; }
+.node-port.side-left { left: -6px; transform: translateY(-50%); }
+.node-port.side-right { right: -6px; transform: translateY(-50%); flex-direction: row-reverse; }
+.node-port.side-top, .node-port.side-bottom { width: 92px; flex-direction: column; gap: 3px; transform: translateX(-50%); }
+.node-port.side-top { top: -6px; }
+.node-port.side-bottom { bottom: -6px; flex-direction: column-reverse; }
+.node-port.side-top span, .node-port.side-bottom span { max-width: 88px; }
+.composite-header { height: 64px; }
+.composite-header .node-icon { font-size: 10px; letter-spacing: .4px; }
+.composite-body { position: absolute; inset: 94px 0 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 0 9px 9px; background: #fff; }
+.composite-section { padding: 7px 12px; border-bottom: 1px solid #edf1f4; }
+.composite-section h4 { margin: 0 0 5px; color: var(--node-accent); font-size: 10px; line-height: 1.15; letter-spacing: .45px; text-transform: uppercase; }
+.composite-section dl { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; }
+.composite-section dl div { min-width: 0; }
+.composite-section dt { color: #83919f; font-size: 10px; line-height: 1.2; }
+.composite-section dd { margin: 1px 0 0; color: #30465b; font-size: 10px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composite-endpoints { display: grid; gap: 3px; }
+.composite-endpoints > div { display: grid; grid-template-columns: minmax(54px, .8fr) 1fr minmax(52px, .8fr); gap: 5px; align-items: center; min-height: 20px; padding: 2px 5px; border: 1px solid #e3e9ee; border-radius: 4px; background: #f8fafc; }
+.composite-endpoints strong, .composite-endpoints span, .composite-endpoints small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.composite-endpoints span { color: #425b73; font-family: Consolas, monospace; }
+.composite-endpoints small { color: #8493a1; }
+.composite-body footer { margin-top: auto; padding: 5px 12px; color: #6f8192; background: color-mix(in srgb, var(--node-accent) 6%, white); border-top: 1px solid color-mix(in srgb, var(--node-accent) 16%, white); font-size: 10px; font-weight: 700; }
 .resize-handle { position: absolute; width: 12px; height: 12px; right: -6px; bottom: -6px; border: 2px solid #fff; border-radius: 3px; background: var(--blue); cursor: nwse-resize; box-shadow: 0 0 0 1px var(--blue); }
 .empty-canvas { position: absolute; left: 560px; top: 330px; width: 340px; text-align: center; color: #8593a1; }
 .empty-canvas div { width: 58px; height: 58px; border: 2px dashed #b8c5d1; border-radius: 14px; display: grid; place-items: center; margin: 0 auto; font-size: 24px; }
@@ -193,6 +215,7 @@ button { color: inherit; }
 .selection-summary span { color: #8b99a6; font-size: 7px; font-weight: 800; letter-spacing: .8px; }
 .selection-summary strong { font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .selection-summary small { color: #98a4af; font-size: 7px; margin-top: 3px; }
+.selection-summary .duplicate-object { margin-left: auto; border: 1px solid #d8e1e8; border-radius: 6px; background: #fff; color: #536b82; padding: 6px 7px; font-size: 10px; font-weight: 700; cursor: pointer; }
 .property-section { padding: 15px 14px; border-bottom: 1px solid #e8edf1; }
 .property-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 10px; color: #485d72; text-transform: uppercase; letter-spacing: .55px; }
 .property-section h3 span { min-width: 17px; height: 17px; border-radius: 9px; display: grid; place-items: center; background: #eef2f5; color: #7c8a97; font-size: 8px; }
@@ -214,7 +237,14 @@ button { color: inherit; }
 .port-property strong { font-size: 9px; }
 .port-property span { color: #8493a1; font-size: 7.5px; margin-top: 2px; text-transform: capitalize; }
 .port-property button, .checkpoint button { border: 0; background: transparent; color: #9aa7b2; cursor: pointer; }
+.port-property select { width: 64px; padding: 4px; margin: 0; font-size: 10px; }
 .add-port-box { margin-top: 11px; padding: 10px; border: 1px dashed #c8d4de; border-radius: 8px; background: #fafcfd; }
+.composite-editor-section { margin: 10px 0; padding: 9px; border: 1px solid #dfe6ec; border-radius: 8px; background: #f8fafc; }
+.composite-editor-section > strong { display: block; margin-bottom: 7px; color: #4b6176; font-size: 10px; text-transform: uppercase; }
+.composite-field-editor { display: grid; grid-template-columns: .8fr 1.2fr; gap: 5px; margin-bottom: 5px; }
+.composite-endpoint-editor { display: grid; grid-template-columns: .8fr 1.1fr .8fr 20px; gap: 4px; margin-bottom: 5px; }
+.composite-field-editor input, .composite-endpoint-editor input { min-width: 0; padding: 6px !important; font-size: 10px !important; }
+.composite-endpoint-editor button { border: 0; background: transparent; color: #a0525c; cursor: pointer; }
 .semantic-lock { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid #dfe6ec; border-radius: 8px; background: #f8fafc; margin-bottom: 12px; }
 .semantic-lock > i { width: 9px; height: 9px; border-radius: 50%; }
 .semantic-lock div { flex: 1; }

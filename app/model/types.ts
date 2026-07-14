@@ -1,5 +1,6 @@
 export type Capability = "HL7" | "FHIR" | "DICOM" | "TCP" | "General Data";
 export type Direction = "inbound" | "outbound";
+export type PortSide = "left" | "right" | "top" | "bottom";
 export type PrimitiveKind = "emr" | "interface" | "application" | "database" | "device" | "cloud";
 
 export type Point = {
@@ -13,6 +14,49 @@ export type Port = {
   direction: Direction;
   capability: Capability;
   subtype: string;
+  side?: PortSide;
+};
+
+export type CompositeField = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export type CompositeEndpoint = {
+  id: string;
+  name: string;
+  address: string;
+  details: string;
+};
+
+export type CompositeSection = {
+  id: string;
+  title: string;
+  kind: "fields" | "endpoints";
+  fields: CompositeField[];
+  endpoints: CompositeEndpoint[];
+};
+
+export type CompositeNodeContent = {
+  templateId: string;
+  headerLabel: string;
+  footer: string;
+  logoText: string;
+  sections: CompositeSection[];
+};
+
+export type CompositeNodeTemplate = {
+  id: string;
+  name: string;
+  category: "gateway" | "server" | "modality-collection" | "database" | "storage" | "browser-client" | "external-system";
+  kind: PrimitiveKind;
+  icon: string;
+  color: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  capabilities: Capability[];
+  content: Omit<CompositeNodeContent, "templateId">;
 };
 
 export type SystemNode = {
@@ -28,6 +72,7 @@ export type SystemNode = {
   capabilities: Capability[];
   ports: Port[];
   containerId?: string;
+  composite?: CompositeNodeContent;
 };
 
 export type DiagramContainer = {
@@ -71,6 +116,7 @@ export type LibraryItem = {
   description: string;
   color: string;
   capabilities: Capability[];
+  templateId?: string;
 };
 
 export type CanvasSettings = {
@@ -98,6 +144,7 @@ export type Project = {
   connections: Connection[];
   processes: DataFlowProcess[];
   customLibrary: LibraryItem[];
+  nodeTemplates: CompositeNodeTemplate[];
 };
 
 export type Selection =
@@ -112,4 +159,5 @@ export type PortDraft = {
   capability: Capability;
   subtype: string;
   name: string;
+  side: PortSide;
 };
