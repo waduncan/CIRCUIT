@@ -1,6 +1,20 @@
 import type { Bounds, DiagramContainer, Point, SystemNode } from "./types";
+import { GRID } from "./project";
 
 export const EMPTY_BOUNDS: Bounds = { x: 0, y: 0, width: 0, height: 0 };
+
+// Background-grid style that tracks the diagram's pan/zoom so grid lines align with the coordinate
+// space (a snapped node at a multiple of GRID lands on a grid line). Returned as plain CSS props
+// (camelCase) for use directly as an element `style`. The four background-size entries match the
+// two major + two minor gradient layers declared in CSS.
+export function gridBackgroundStyle(pan: Point, zoom: number): { backgroundPosition: string; backgroundSize: string } {
+  const minor = GRID * zoom;
+  const major = minor * 5;
+  return {
+    backgroundPosition: `${pan.x}px ${pan.y}px`,
+    backgroundSize: `${major}px ${major}px, ${major}px ${major}px, ${minor}px ${minor}px, ${minor}px ${minor}px`,
+  };
+}
 
 export function boundsFromNodes(nodes: SystemNode[]): Bounds {
   if (!nodes.length) return EMPTY_BOUNDS;
