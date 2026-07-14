@@ -99,6 +99,31 @@ export type Connection = {
   dataType: string;
   description: string;
   bendPoints?: Point[];
+  style?: ConnectionStyle;
+  labels?: ConnectionLabel[];
+};
+
+export type ConnectionLineStyle = "solid" | "dashed" | "dotted";
+export type ConnectionArrowStyle = "none" | "end" | "start" | "both";
+
+export type ConnectionStyle = {
+  lineStyle: ConnectionLineStyle;
+  color?: string;
+  width: number;
+  opacity: number;
+  arrowStyle: ConnectionArrowStyle;
+};
+
+export type ConnectionLabel = {
+  id: string;
+  text: string;
+  anchor: "route" | "segment";
+  position: number;
+  segmentIndex?: number;
+  offsetX: number;
+  offsetY: number;
+  background: boolean;
+  rotation: number;
 };
 
 export type DataFlowProcess = {

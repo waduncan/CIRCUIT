@@ -28,13 +28,24 @@ export function svgPath(points: Point[]): string {
 }
 
 export function routeMidpoint(points: Point[]): Point {
+  return pointAlongRoute(points, 0.5);
+}
+
+export function pointAlongRoute(points: Point[], position: number, segmentIndex?: number): Point {
+  if (segmentIndex !== undefined) {
+    const index = Math.max(0, Math.min(points.length - 2, segmentIndex));
+    const start = points[index] ?? points[0] ?? { x: 0, y: 0 };
+    const end = points[index + 1] ?? start;
+    const ratio = Math.max(0, Math.min(1, position));
+    return { x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio };
+  }
   const segments = points.slice(1).map((point, index) => ({
     start: points[index],
     end: point,
     length: Math.abs(point.x - points[index].x) + Math.abs(point.y - points[index].y),
   }));
   const totalLength = segments.reduce((sum, segment) => sum + segment.length, 0);
-  let remaining = totalLength / 2;
+  let remaining = totalLength * Math.max(0, Math.min(1, position));
   for (const segment of segments) {
     if (remaining <= segment.length) {
       const ratio = segment.length ? remaining / segment.length : 0;
