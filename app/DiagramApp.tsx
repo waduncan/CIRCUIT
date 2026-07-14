@@ -9,6 +9,7 @@ import {
 import { ExportDialog } from "./components/ExportDialog";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
+import { ObjectLibraryView } from "./components/ObjectLibraryView";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { ContainerLayer } from "./components/canvas/ContainerLayer";
 import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer";
@@ -28,11 +29,11 @@ import { downloadJson } from "./utils/download";
 export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
   const { selection, setSelection, connecting, setConnecting, modifierKeys } = useEditorInteraction();
-  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, handleWheel, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, onClearSelection: () => setSelection(null) });
+  const [activeView, setActiveView] = useState<"diagram" | "library">("diagram");
+  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, handleWheel, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
   const [toast, setToast] = useState<string | null>(null);
   const [activeProcessId, setActiveProcessId] = useState<string | null>("proc-order");
   const [isAnimating, setIsAnimating] = useState(true);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [processOpen, setProcessOpen] = useState(true);
@@ -262,7 +263,12 @@ export default function DiagramApp() {
         <div className="project-divider" />
         <button className="project-title-button" onClick={() => setNewProjectOpen(true)} aria-label="Project options">
           <span>{project.name}</span><small>Saved locally · {project.nodes.length} systems</small>
-        </button><label className="presentation-toggle"><span>Clean</span><Switch checked={project.presentation === "detailed"} onCheckedChange={(checked) => dispatch({ type: "presentation.update", presentation: checked ? "detailed" : "clean" })} aria-label="Toggle detailed object view" /><span>Detailed</span></label>
+        </button>
+        <nav className="workspace-navigation" aria-label="Project views">
+          <button className={activeView === "diagram" ? "active" : ""} aria-current={activeView === "diagram" ? "page" : undefined} onClick={() => setActiveView("diagram")}>Diagram</button>
+          <button className={activeView === "library" ? "active" : ""} aria-current={activeView === "library" ? "page" : undefined} onClick={() => setActiveView("library")}>Object library</button>
+        </nav>
+        {activeView === "diagram" && <label className="presentation-toggle"><span>Clean</span><Switch checked={project.presentation === "detailed"} onCheckedChange={(checked) => dispatch({ type: "presentation.update", presentation: checked ? "detailed" : "clean" })} aria-label="Toggle detailed object view" /><span>Detailed</span></label>}
         <div className="topbar-actions">
           <button className="button ghost" onClick={() => fileInputRef.current?.click()}>Open JSON</button>
           <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importProject(event.target.files[0])} />
@@ -271,11 +277,11 @@ export default function DiagramApp() {
         </div>
       </header>
 
-      <div className="workspace">
+      {activeView === "diagram" ? <div className="workspace">
         <aside className="library-panel">
           <div className="panel-heading">
             <div><span className="eyebrow">Build</span><h2>Object library</h2></div>
-            <button className="icon-button" onClick={() => setLibraryOpen(true)} aria-label="Manage object library">⚙</button>
+            <button className="icon-button" onClick={() => setActiveView("library")} aria-label="Manage object library">⚙</button>
           </div>
           <div className="library-search">⌕ <span>Search systems…</span><kbd>⌘K</kbd></div>
           <p className="section-label">Healthcare primitives</p>
@@ -288,7 +294,7 @@ export default function DiagramApp() {
               </div>
             ))}
           </div>
-          <button className="manage-library" onClick={() => setLibraryOpen(true)}>＋ Create custom object</button>
+          <button className="manage-library" onClick={() => setActiveView("library")}>＋ Create custom object</button>
           <div className="tip-card"><span>TIP</span><p>Drag an object onto the canvas, then define its capabilities and ports in Properties.</p></div>
         </aside>
 
@@ -377,15 +383,9 @@ export default function DiagramApp() {
           onUpdateConnection={updateConnection}
           onUpdateProcess={updateProcess}
         />
-      </div>
+      </div> : <ObjectLibraryView items={allLibraryItems} customItems={project.customLibrary} newTemplateName={newTemplateName} newTemplateKind={newTemplateKind} libraryInputRef={libraryInputRef} onTemplateNameChange={setNewTemplateName} onTemplateKindChange={setNewTemplateKind} onCreateTemplate={createTemplate} onRemoveTemplate={(id) => dispatch({ type: "library.remove", id })} onExportLibrary={() => downloadJson(project.customLibrary, "careflow-object-library.json")} onImportLibrary={importLibrary} onReturnToDiagram={() => setActiveView("diagram")} />}
 
       {toast && <div className="toast"><span>i</span>{toast}<button onClick={() => setToast(null)}>×</button></div>}
-
-      {libraryOpen && (
-        <div className="modal-backdrop" onPointerDown={(event) => event.target === event.currentTarget && setLibraryOpen(false)}>
-          <div className="modal library-modal"><div className="modal-header"><div><span className="eyebrow">Reusable assets</span><h2>Object library manager</h2><p>Build a project-independent library of healthcare system primitives.</p></div><button onClick={() => setLibraryOpen(false)}>×</button></div><div className="modal-body"><div className="template-grid">{allLibraryItems.map((item) => <div className="template-card" key={item.id}><div className="library-icon" style={{ "--accent": item.color } as React.CSSProperties}>{icons[item.kind]}</div><strong>{item.name}</strong><span>{item.description}</span><div>{item.capabilities.map((capability) => <i key={capability}>{capability}</i>)}</div>{project.customLibrary.some((custom) => custom.id === item.id) && <button onClick={() => dispatch({ type: "library.remove", id: item.id })}>Remove</button>}</div>)}</div><div className="template-builder"><h3>Create custom object</h3><p>Start with a primitive, then configure the instance on your canvas.</p><label>Object name<input placeholder="e.g. Cardiology Archive" value={newTemplateName} onChange={(event) => setNewTemplateName(event.target.value)} /></label><label>Starting primitive<select value={newTemplateKind} onChange={(event) => setNewTemplateKind(event.target.value as PrimitiveKind)}>{primitiveLibrary.map((item) => <option key={item.kind} value={item.kind}>{item.name}</option>)}</select></label><button className="button primary full" onClick={createTemplate}>Create object template</button><hr /><button className="button secondary full" onClick={() => downloadJson(project.customLibrary, "careflow-object-library.json")}>Export custom library</button><button className="button ghost full" onClick={() => libraryInputRef.current?.click()}>Import library JSON</button><input ref={libraryInputRef} type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importLibrary(event.target.files[0])} /></div></div></div>
-        </div>
-      )}
 
       {newProjectOpen && (
         <div className="modal-backdrop" onPointerDown={(event) => event.target === event.currentTarget && setNewProjectOpen(false)}>

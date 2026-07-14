@@ -17,14 +17,16 @@ type CanvasViewportOptions = {
   containers: DiagramContainer[];
   canvas: CanvasSettings;
   onClearSelection: () => void;
+  active?: boolean;
 };
 
-export function useCanvasViewport({ nodes, containers, canvas, onClearSelection }: CanvasViewportOptions) {
+export function useCanvasViewport({ nodes, containers, canvas, onClearSelection, active = true }: CanvasViewportOptions) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ zoom: 0.82, pan: { x: 20, y: 20 } as Point });
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
 
   useEffect(() => {
+    if (!active) return;
     const element = viewportRef.current;
     if (!element) return;
     const updateSize = () => setViewportSize({ width: element.clientWidth, height: element.clientHeight });
@@ -32,7 +34,7 @@ export function useCanvasViewport({ nodes, containers, canvas, onClearSelection 
     const observer = new ResizeObserver(updateSize);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [active]);
 
   const zoomAt = useCallback((client: Point, requestedZoom: number) => {
     const rect = viewportRef.current?.getBoundingClientRect();
