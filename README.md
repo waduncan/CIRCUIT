@@ -1,6 +1,13 @@
-# CareFlow Studio
+# CIRCUIT
 
-A completely local, client-side React application built with Vite and Tailwind
+## Clinical Interface Routing, Connectivity, and Unified Integration Tool
+
+## Why this was made 
+Working in Healthcare IT, you end up making a lot of visio diagrams; usually those diagrams are complicated 
+and large. CIRCUIT aims to speed up this process by creating an opinionated way to visualizing how healthcare IT systems
+connect and trasmit data while remaining verbose and detailed. 
+
+CIRCUIT is a completely local, client-side React application built with Vite and Tailwind
 CSS. Projects are saved in the browser's local storage and can be imported or
 exported as JSON files.
 
@@ -38,14 +45,6 @@ previews that build locally. Neither command deploys or uploads anything.
 - `npm run start`: preview the production build locally
 - `npm test`: build and verify the generated SPA shell
 
-## Project structure
-
-- `index.html`: local browser document and page metadata
-- `main.tsx`: React application entry point
-- `app/DiagramApp.tsx`: diagram editor application
-- `app/globals.css`: Tailwind directives and application styles
-- `tailwind.config.js`: Tailwind scanning and local system-font configuration
-- `public/`: static local assets
 
 The application has no Next.js, Vinext, authentication, database, cloud,
 hosting, or server-rendering dependency. A future API can be added separately
