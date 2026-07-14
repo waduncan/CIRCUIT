@@ -18,6 +18,14 @@ test("keeps editor CSS font sizes at or above 10px", async () => {
   assert.match(css, /\.port-property strong \{ font-size: 12px/);
 });
 
+test("does not permanently promote the zoomed canvas to a compositor layer", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  const diagramSurfaceRule = css.match(/\.diagram-surface\s*\{([^}]*)\}/)?.[1];
+
+  assert.ok(diagramSurfaceRule, "expected a diagram surface rule");
+  assert.doesNotMatch(diagramSurfaceRule, /will-change\s*:\s*transform/);
+});
+
 test("keeps exported SVG text at or above 10px", async () => {
   const [renderer, printDocument] = await Promise.all([
     readFile(new URL("app/model/exportSvg.ts", root), "utf8"),
