@@ -15,7 +15,7 @@ import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer";
 import { useProjectDocument } from "./hooks/useProjectDocument";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useEditorInteraction } from "./hooks/useEditorInteraction";
-import { useDiagramInteractions } from "./hooks/useDiagramInteractions";
+import { useDiagramInteractions } from "./hooks/useDiagramInteractions"; import { getProjectObject } from "./model/projectObject";
 import { useContainerInteractions } from "./hooks/useContainerInteractions";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
 import { cloneCompositeContent, compositeLibraryItems } from "./model/compositeTemplates";
@@ -52,9 +52,9 @@ export default function DiagramApp() {
   }, [toast]);
 
   const allLibraryItems = useMemo(() => [...primitiveLibrary, ...compositeLibraryItems(project.nodeTemplates), ...project.customLibrary], [project.customLibrary, project.nodeTemplates]);
-  const selectedNode = selection?.type === "node" ? project.nodes.find((node) => node.id === selection.id) : undefined;
-  const selectedProcess = selection?.type === "process" ? project.processes.find((process) => process.id === selection.id) : undefined;
-  const activeProcess = project.processes.find((process) => process.id === activeProcessId);
+  const selectedNode = selection?.type === "node" ? getProjectObject(project, "node", selection.id) : undefined;
+  const selectedProcess = selection?.type === "process" ? getProjectObject(project, "process", selection.id) : undefined;
+  const activeProcess = getProjectObject(project, "process", activeProcessId);
   const activeRoute = useMemo(() => activeProcess ? calculateProcessRoute(project, activeProcess.checkpoints) : [], [project, activeProcess]);
   const contentBounds = useMemo(() => expandBounds(unionBounds(boundsFromNodes(project.nodes), boundsFromContainers(project.containers)), 400), [project.containers, project.nodes]);
   const renderBounds = useMemo<Bounds>(() => project.canvas.mode === "bounded"
@@ -62,19 +62,19 @@ export default function DiagramApp() {
     : unionBounds(contentBounds, viewportBounds), [contentBounds, project.canvas, viewportBounds]);
   const selectionBounds = useMemo<Bounds | null>(() => {
     if (selection?.type === "container") {
-      const container = project.containers.find((item) => item.id === selection.id);
+      const container = getProjectObject(project, "container", selection.id);
       return container ? containerBounds(container) : null;
     }
     if (selection?.type === "node") {
-      const node = project.nodes.find((item) => item.id === selection.id);
+      const node = getProjectObject(project, "node", selection.id);
       return node ? nodeBounds(node) : null;
     }
     if (selection?.type === "connection") {
-      const connection = project.connections.find((item) => item.id === selection.id);
+      const connection = getProjectObject(project, "connection", selection.id);
       return connection ? boundsFromPoints(connectionRoute(project, connection)) : null;
     }
     if (selection?.type === "process") {
-      const process = project.processes.find((item) => item.id === selection.id);
+      const process = getProjectObject(project, "process", selection.id);
       return process ? boundsFromNodes(project.nodes.filter((node) => process.checkpoints.includes(node.id))) : null;
     }
     return null;
@@ -121,8 +121,8 @@ export default function DiagramApp() {
       showToast(`Connecting from ${node.name} · ${port.name}`);
       return;
     }
-    const sourceNode = project.nodes.find((item) => item.id === connecting.nodeId);
-    const sourcePort = sourceNode?.ports.find((item) => item.id === connecting.portId);
+    const sourceNode = getProjectObject(project, "node", connecting.nodeId);
+    const sourcePort = getProjectObject(project, "port", connecting.portId);
     if (!sourceNode || !sourcePort) { setConnecting(null); return; }
     if (port.direction !== "inbound") {
       showToast("Connections must finish at an inbound port.");
@@ -148,7 +148,7 @@ export default function DiagramApp() {
   };
 
   const addNodeFromLibrary = (item: LibraryItem, x = 480, y = 360) => {
-    const template = item.templateId ? project.nodeTemplates.find((entry) => entry.id === item.templateId) : undefined;
+    const template = getProjectObject(project, "nodeTemplate", item.templateId);
     const nested = item.kind === "nestable", node: SystemNode = { id: createId("node"), name: nested ? "Modality group" : item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: nested ? 560 : template?.defaultWidth ?? 224, height: nested ? 400 : template?.defaultHeight ?? 176, color: item.color, capabilities: [...item.capabilities], ports: [], composite: template ? cloneCompositeContent(template) : undefined };
     dispatch({ type: "node.add", node });
     setSelection({ type: "node", id: node.id });
@@ -352,7 +352,7 @@ export default function DiagramApp() {
                     <button className={`play-button ${isAnimating ? "playing" : ""}`} onClick={() => setIsAnimating((value) => !value)}>{isAnimating ? "Ⅱ" : "▶"}</button>
                     <div className="process-copy"><strong>{activeProcess.name}</strong><span>{activeProcess.description}</span></div>
                     <div className="route-points">
-                      {activeProcess.checkpoints.map((nodeId, index) => <span key={`${nodeId}-${index}`}>{project.nodes.find((node) => node.id === nodeId)?.name ?? "Missing point"}{index < activeProcess.checkpoints.length - 1 && <i>→</i>}</span>)}
+                      {activeProcess.checkpoints.map((nodeId, index) => <span key={`${nodeId}-${index}`}>{getProjectObject(project, "node", nodeId)?.name ?? "Missing point"}{index < activeProcess.checkpoints.length - 1 && <i>→</i>}</span>)}
                     </div>
                     <div className={`route-status ${activeRoute.length ? "valid" : "invalid"}`}><i />{activeRoute.length ? `${activeRoute.length} connection${activeRoute.length === 1 ? "" : "s"} routed` : "No valid route"}</div>
                   </div>

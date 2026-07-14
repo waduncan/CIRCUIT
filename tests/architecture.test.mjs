@@ -31,3 +31,14 @@ test("defines typed document commands and migration boundaries", async () => {
   assert.match(project, /migrateProjectDocument/);
   assert.match(persistence, /migrateProjectDocument/);
 });
+
+test("SystemNodeLayer delegates node markup to the SystemNode renderer", async () => {
+  const [layer, node] = await Promise.all([
+    readFile(new URL("app/components/canvas/SystemNodeLayer.tsx", root), "utf8"),
+    readFile(new URL("app/components/canvas/SystemNode.tsx", root), "utf8"),
+  ]);
+
+  assert.match(layer, /import \{ SystemNode as SystemNodeRenderer \} from "\.\/SystemNode"/);
+  assert.match(layer, /<SystemNodeRenderer/);
+  assert.match(node, /export function SystemNode/);
+});

@@ -1,5 +1,6 @@
 import { capabilityConfig, icons, primitiveLibrary } from "./catalog";
 import { connectionRoute, pointAlongRoute, portPosition, portTilePosition, svgPath } from "./routing";
+import { getProjectObject } from "./projectObject";
 import type { Capability, DiagramContainer, Project, SystemNode } from "./types";
 
 // Pure, dependency-free renderer that serialises a Project into a standalone SVG document.
@@ -164,7 +165,7 @@ function renderNode(node: SystemNode, project: Project): string {
 }
 
 function renderConnection(project: Project, connectionId: string): string {
-  const connection = project.connections.find((item) => item.id === connectionId)!;
+  const connection = getProjectObject(project, "connection", connectionId)!;
   const route = connectionRoute(project, connection);
   const path = svgPath(route);
   const style = connection.style ?? { lineStyle: "solid", width: 2.4, opacity: .72, arrowStyle: "none" };

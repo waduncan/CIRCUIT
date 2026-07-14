@@ -1,5 +1,6 @@
 import type { Connection, Point, Project } from "./types";
 import { snap } from "./project";
+import { getProjectObject } from "./projectObject";
 
 export function compactPoints(points: Point[]): Point[] {
   return points.filter((point, index) => {
@@ -60,9 +61,9 @@ export function pointAlongRoute(points: Point[], position: number, segmentIndex?
 }
 
 export function portTilePosition(project: Pick<Project, "nodes">, nodeId: string, portId: string): Point {
-  const node = project.nodes.find((item) => item.id === nodeId);
+  const node = getProjectObject(project, "node", nodeId);
   if (!node) return { x: 0, y: 0 };
-  const port = node.ports.find((item) => item.id === portId);
+  const port = getProjectObject(project, "port", portId);
   if (!port) return { x: node.x, y: node.y };
   const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
   const sameSide = node.ports.filter((item) => (item.side ?? (item.direction === "inbound" ? "left" : "right")) === side);
@@ -75,8 +76,8 @@ export function portTilePosition(project: Pick<Project, "nodes">, nodeId: string
 
 export function portPosition(project: Pick<Project, "nodes">, nodeId: string, portId: string): Point {
   const center = portTilePosition(project, nodeId, portId);
-  const node = project.nodes.find((item) => item.id === nodeId);
-  const port = node?.ports.find((item) => item.id === portId);
+  const node = getProjectObject(project, "node", nodeId);
+  const port = getProjectObject(project, "port", portId);
   if (!node || !port) return center;
   const side = port.side ?? (port.direction === "inbound" ? "left" : "right");
   if (side === "left") return { x: center.x - (port.width ?? 92) / 2, y: center.y };

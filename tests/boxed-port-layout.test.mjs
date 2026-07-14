@@ -16,18 +16,18 @@ test("persists boxed port edge, offset, dimensions, and secondary identifier", a
 });
 
 test("supports dragging and resizing port tiles independently of connection semantics", async () => {
-  const [hook, layer, inspector] = await Promise.all([
+  const [hook, node, inspector] = await Promise.all([
     readFile(new URL("app/hooks/useDiagramInteractions.ts", root), "utf8"),
-    readFile(new URL("app/components/canvas/SystemNodeLayer.tsx", root), "utf8"),
+    readFile(new URL("app/components/canvas/SystemNode.tsx", root), "utf8"),
     readFile(new URL("app/components/PropertiesInspector.tsx", root), "utf8"),
   ]);
   assert.match(hook, /beginPortDrag/);
   assert.match(hook, /beginPortResize/);
   assert.match(hook, /setSelection\(\{ type: "node", id: node\.id \}\)/);
   assert.match(hook, /PortSide/);
-  assert.match(layer, /port-resize-handle/);
-  assert.match(layer, /dataset\.selectOnly/);
-  assert.match(layer, /secondaryIdentifier/);
+  assert.match(node, /port-resize-handle/);
+  assert.match(node, /dataset\.selectOnly/);
+  assert.match(node, /secondaryIdentifier/);
   assert.match(inspector, /semantics remain independent of edge placement/);
 });
 

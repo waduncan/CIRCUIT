@@ -22,10 +22,10 @@ test("persists project-owned composite templates and structured node content", a
 });
 
 test("creates, duplicates, and edits composite node instances", async () => {
-  const [app, inspector, layer] = await Promise.all([
+  const [app, inspector, node] = await Promise.all([
     readFile(new URL("app/DiagramApp.tsx", root), "utf8"),
     readFile(new URL("app/components/PropertiesInspector.tsx", root), "utf8"),
-    readFile(new URL("app/components/canvas/SystemNodeLayer.tsx", root), "utf8"),
+    readFile(new URL("app/components/canvas/SystemNode.tsx", root), "utf8"),
   ]);
 
   assert.match(app, /compositeLibraryItems\(project\.nodeTemplates\)/);
@@ -34,8 +34,8 @@ test("creates, duplicates, and edits composite node instances", async () => {
   assert.match(inspector, /Card template/);
   assert.match(inspector, /Composite content/);
   assert.match(inspector, /Add endpoint row/);
-  assert.match(layer, /composite-section/);
-  assert.match(layer, /composite-endpoints/);
+  assert.match(node, /composite-section/);
+  assert.match(node, /composite-endpoints/);
 });
 
 test("supports four-sided port groups in routing, editing, and export", async () => {

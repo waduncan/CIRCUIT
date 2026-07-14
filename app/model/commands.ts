@@ -1,5 +1,6 @@
 import { containerForNode, reconcileNodeContainers } from "./containers";
 import { reconcileNestedNodes } from "./nesting";
+import { getProjectObject } from "./projectObject";
 import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Project, Selection, SystemNode } from "./types";
 
 export type ProjectCommand =
@@ -29,9 +30,9 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
         const geometryChanged = "x" in command.patch || "y" in command.patch || "width" in command.patch || "height" in command.patch;
         return geometryChanged ? { ...nextNode, containerId: containerForNode(nextNode, project.containers) } : nextNode;
       });
-      const movedParent = project.nodes.find((node) => node.id === command.id && node.kind === "nestable");
-      const dx = movedParent && typeof command.patch.x === "number" ? command.patch.x - movedParent.x : 0;
-      const dy = movedParent && typeof command.patch.y === "number" ? command.patch.y - movedParent.y : 0;
+      const movedParent = getProjectObject(project, "node", command.id);
+      const dx = movedParent?.kind === "nestable" && typeof command.patch.x === "number" ? command.patch.x - movedParent.x : 0;
+      const dy = movedParent?.kind === "nestable" && typeof command.patch.y === "number" ? command.patch.y - movedParent.y : 0;
       const movedNodes = updated.map((node) => node.nestedParentId === command.id && (dx || dy) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
       return { ...project, nodes: reconcileNestedNodes(movedNodes) };
     }

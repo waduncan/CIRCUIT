@@ -16,15 +16,17 @@ test("persists a backwards-compatible global node presentation mode", async () =
 });
 
 test("uses the shadcn Base UI switch to toggle clean and detailed node views", async () => {
-  const [switchComponent, app, layer] = await Promise.all([
+  const [switchComponent, app, node] = await Promise.all([
     readFile(new URL("app/components/ui/Switch.tsx", root), "utf8"),
     readFile(new URL("app/DiagramApp.tsx", root), "utf8"),
-    readFile(new URL("app/components/canvas/SystemNodeLayer.tsx", root), "utf8"),
+    readFile(new URL("app/components/canvas/SystemNode.tsx", root), "utf8"),
   ]);
   assert.match(switchComponent, /@base-ui\/react\/switch/);
   assert.match(app, /Toggle detailed object view/);
-  assert.match(layer, /clean-node-body/);
-  assert.ok(layer.indexOf("node.ports.filter") > layer.indexOf('project.presentation === "clean"'), "ports must render outside the presentation-specific card content");
+  assert.match(node, /clean-node-body/);
+  assert.match(node, /popover-composite-body/);
+  assert.doesNotMatch(node, /<PopoverDescription>/);
+  assert.ok(node.indexOf("node.ports.filter") > node.indexOf('project.presentation === "clean"'), "ports must render outside the presentation-specific card content");
 });
 
 test("exports clean nodes without changing exported port tiles", async () => {
