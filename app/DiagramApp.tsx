@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ExportDialog } from "./components/ExportDialog";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
@@ -24,11 +17,12 @@ import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProje
 import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
 import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, gridBackgroundStyle, nodeBounds, unionBounds } from "./model/viewport";
 import { containerBounds } from "./model/containers";
+import { nearestEligibleConnectionPort } from "./model/connectionHitTest";
 import type { Bounds, Connection, DataFlowProcess as Process, DiagramContainer, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
 import { downloadJson } from "./utils/download";
 export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
-  const { selection, setSelection, connecting, setConnecting, modifierKeys } = useEditorInteraction();
+  const { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys } = useEditorInteraction();
   const [activeView, setActiveView] = useState<"diagram" | "library">("diagram");
   const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, handleWheel, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
   const [toast, setToast] = useState<string | null>(null);
@@ -45,12 +39,12 @@ export default function DiagramApp() {
   const [portDraft, setPortDraft] = useState<PortDraft>({ direction: "inbound", capability: "HL7", subtype: "ADT", name: "", side: "left", secondaryIdentifier: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
+  const connectionPointerHandledRef = useRef(false);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
   const allLibraryItems = useMemo(() => [...primitiveLibrary, ...compositeLibraryItems(project.nodeTemplates), ...project.customLibrary], [project.customLibrary, project.nodeTemplates]);
   const selectedNode = selection?.type === "node" ? getProjectObject(project, "node", selection.id) : undefined;
   const selectedProcess = selection?.type === "process" ? getProjectObject(project, "process", selection.id) : undefined;
@@ -79,7 +73,6 @@ export default function DiagramApp() {
     }
     return null;
   }, [project, selection]);
-
   useEffect(() => {
     if (!selectedNode || !selectedNode.capabilities.length || selectedNode.capabilities.includes(portDraft.capability)) return;
     const capability = selectedNode.capabilities[0];
@@ -99,11 +92,9 @@ export default function DiagramApp() {
   const updateProcess = useCallback((processId: string, patch: Partial<Process>, coalesceKey?: string) => {
     dispatch({ type: "process.update", id: processId, patch }, coalesceKey);
   }, [dispatch]);
-
   const showToast = (message: string) => setToast(message);
   const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, showToast });
   const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ zoom, setSelection, updateContainer });
-
   const addContainer = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const center = rect ? toCanvasPoint({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, rect) : { x: 480, y: 360 };
@@ -111,13 +102,13 @@ export default function DiagramApp() {
     dispatch({ type: "container.add", container });
     setSelection({ type: "container", id: container.id });
   };
-
   const handlePortClick = (node: SystemNode, port: Port) => {
     if (!connecting) {
       if (port.direction !== "outbound") {
         showToast("Start a connection from an outbound port.");
         return;
       }
+      setConnectionMode(true);
       setConnecting({ nodeId: node.id, portId: port.id });
       showToast(`Connecting from ${node.name} · ${port.name}`);
       return;
@@ -147,7 +138,14 @@ export default function DiagramApp() {
     setSelection({ type: "connection", id: connection.id });
     showToast(`${connection.capability} ${connection.subtype} connection created.`);
   };
-
+  const handleConnectionPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!connectionMode || event.button !== 0 || !rect) return;
+    const target = nearestEligibleConnectionPort(project, toCanvasPoint({ x: event.clientX, y: event.clientY }, rect), 28 / zoom, connecting);
+    if (!target) return;
+    event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = true;
+    handlePortClick(target.node, target.port);
+  };
   const addNodeFromLibrary = (item: LibraryItem, x = 480, y = 360) => {
     const template = getProjectObject(project, "nodeTemplate", item.templateId);
     const nested = item.kind === "nestable", node: SystemNode = { id: createId("node"), name: nested ? "Modality group" : item.name, kind: item.kind, description: item.description, x: snap(x), y: snap(y), width: nested ? 560 : template?.defaultWidth ?? 224, height: nested ? 400 : template?.defaultHeight ?? 176, color: item.color, capabilities: [...item.capabilities], ports: [], composite: template ? cloneCompositeContent(template) : undefined };
@@ -155,10 +153,9 @@ export default function DiagramApp() {
     setSelection({ type: "node", id: node.id });
     showToast(`${node.name} added. Add ports from Properties.`);
   };
-
   const handleCanvasDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const libraryId = event.dataTransfer.getData("application/x-careflow-library");
+    const libraryId = event.dataTransfer.getData("application/x-circuit-library");
     const item = allLibraryItems.find((entry) => entry.id === libraryId);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!item || !rect) return;
@@ -220,7 +217,7 @@ export default function DiagramApp() {
       setProject(parsed);
       setSelection(null);
       showToast(`${parsed.name} opened.`);
-    } catch { showToast("That file is not a valid CareFlow project."); }
+    } catch { showToast("That file is not a valid circuit project."); }
   };
 
   const importLibrary = async (file: File) => {
@@ -259,7 +256,7 @@ export default function DiagramApp() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-mark">CF</div>
-        <div className="brand-copy"><strong>CareFlow Studio</strong><span>Healthcare connectivity modeling</span></div>
+        <div className="brand-copy"><strong>CIRCUIT Studio</strong><span>Healthcare connectivity modeling</span></div>
         <div className="project-divider" />
         <button className="project-title-button" onClick={() => setNewProjectOpen(true)} aria-label="Project options">
           <span>{project.name}</span><small>Saved locally · {project.nodes.length} systems</small>
@@ -287,7 +284,7 @@ export default function DiagramApp() {
           <p className="section-label">Healthcare primitives</p>
           <div className="library-list">
             {allLibraryItems.map((item) => (
-              <div key={item.id} className="library-card" draggable onDragStart={(event) => event.dataTransfer.setData("application/x-careflow-library", item.id)} onDoubleClick={() => addNodeFromLibrary(item)}>
+              <div key={item.id} className="library-card" draggable onDragStart={(event) => event.dataTransfer.setData("application/x-circuit-library", item.id)} onDoubleClick={() => addNodeFromLibrary(item)}>
                 <div className="library-icon" style={{ "--accent": item.color } as React.CSSProperties}>{icons[item.kind]}</div>
                 <div><strong>{item.name}</strong><span>{item.capabilities.join(" · ")}</span></div>
                 <span className="drag-grip">⠿</span>
@@ -299,11 +296,13 @@ export default function DiagramApp() {
         </aside>
 
         <section className="canvas-column">
-          <CanvasToolbar canvas={project.canvas} zoom={zoom} connecting={Boolean(connecting)} containerEditing={containerEditing} canUndo={canUndo} canRedo={canRedo} canFitSelection={Boolean(selectionBounds)} onSelect={() => { setContainerEditing(false); if (selection?.type === "container") setSelection(null); }} onPan={() => setConnecting(null)} onConnect={() => { setConnecting(null); showToast("Click an outbound port, then a compatible inbound port."); }} onAddProcess={addProcess} onToggleContainers={() => { setContainerEditing((value) => !value); setConnecting(null); setSelection(null); }} onAddContainer={addContainer} onUndo={undo} onRedo={redo} onUpdateCanvas={(patch) => dispatch({ type: "canvas.update", patch })} onZoomOut={zoomOut} onZoomIn={zoomIn} onFitDocument={fitDocument} onFitSelection={() => selectionBounds && fitBounds(selectionBounds)} onResetView={resetView} />
+          <CanvasToolbar canvas={project.canvas} zoom={zoom} connecting={connectionMode} containerEditing={containerEditing} canUndo={canUndo} canRedo={canRedo} canFitSelection={Boolean(selectionBounds)} onSelect={() => { setConnectionMode(false); setConnecting(null); setContainerEditing(false); if (selection?.type === "container") setSelection(null); }} onPan={() => { setConnectionMode(false); setConnecting(null); }} onConnect={() => { setConnectionMode(true); setConnecting(null); showToast("Click an outbound port, then a compatible inbound port."); }} onAddProcess={addProcess} onToggleContainers={() => { setConnectionMode(false); setContainerEditing((value) => !value); setConnecting(null); setSelection(null); }} onAddContainer={addContainer} onUndo={undo} onRedo={redo} onUpdateCanvas={(patch) => dispatch({ type: "canvas.update", patch })} onZoomOut={zoomOut} onZoomIn={zoomIn} onFitDocument={fitDocument} onFitSelection={() => selectionBounds && fitBounds(selectionBounds)} onResetView={resetView} />
 
           <div
-            className={`canvas-viewport ${connecting ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""} ${zoom < 0.6 ? "grid-hide-minor" : ""}`}
+            className={`canvas-viewport ${connectionMode ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""} ${zoom < 0.6 ? "grid-hide-minor" : ""}`}
             ref={canvasRef}
+            onPointerDownCapture={handleConnectionPointerDown}
+            onClickCapture={(event) => { if (connectionPointerHandledRef.current) { event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = false; } }}
             onPointerDown={beginPan}
             onWheel={handleWheel}
             onDragOver={(event) => event.preventDefault()}
@@ -332,7 +331,7 @@ export default function DiagramApp() {
                   showToast(`Bend point ${pointIndex + 1} removed.`);
                 }}
                 onUpdateConnection={updateConnection} />
-              <SystemNodeLayer project={project} selection={selection} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} onBeginPortDrag={beginPortDrag} onBeginPortResize={beginPortResize} />
+              <SystemNodeLayer project={project} selection={selection} connectionMode={connectionMode} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} onBeginPortDrag={beginPortDrag} onBeginPortResize={beginPortResize} />
             </div>
 
             <div className="minimap">
@@ -383,7 +382,7 @@ export default function DiagramApp() {
           onUpdateConnection={updateConnection}
           onUpdateProcess={updateProcess}
         />
-      </div> : <ObjectLibraryView items={allLibraryItems} customItems={project.customLibrary} newTemplateName={newTemplateName} newTemplateKind={newTemplateKind} libraryInputRef={libraryInputRef} onTemplateNameChange={setNewTemplateName} onTemplateKindChange={setNewTemplateKind} onCreateTemplate={createTemplate} onRemoveTemplate={(id) => dispatch({ type: "library.remove", id })} onExportLibrary={() => downloadJson(project.customLibrary, "careflow-object-library.json")} onImportLibrary={importLibrary} onReturnToDiagram={() => setActiveView("diagram")} />}
+      </div> : <ObjectLibraryView items={allLibraryItems} customItems={project.customLibrary} newTemplateName={newTemplateName} newTemplateKind={newTemplateKind} libraryInputRef={libraryInputRef} onTemplateNameChange={setNewTemplateName} onTemplateKindChange={setNewTemplateKind} onCreateTemplate={createTemplate} onRemoveTemplate={(id) => dispatch({ type: "library.remove", id })} onExportLibrary={() => downloadJson(project.customLibrary, "circuit-object-library.json")} onImportLibrary={importLibrary} onReturnToDiagram={() => setActiveView("diagram")} />}
 
       {toast && <div className="toast"><span>i</span>{toast}<button onClick={() => setToast(null)}>×</button></div>}
 

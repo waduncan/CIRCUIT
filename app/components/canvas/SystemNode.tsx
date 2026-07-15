@@ -15,6 +15,7 @@ export type SystemNodeProps = {
   node: SystemNodeModel;
   selected: boolean;
   inActiveProcess: boolean;
+  connectionMode: boolean;
   connecting: { nodeId: string; portId: string } | null;
   activeProcess?: DataFlowProcess;
   onBeginNodeDrag: (event: ReactPointerEvent, node: SystemNodeModel) => void;
@@ -24,7 +25,7 @@ export type SystemNodeProps = {
   onBeginPortResize: (event: ReactPointerEvent<HTMLElement>, node: SystemNodeModel, port: Port) => void;
 };
 
-export function SystemNode({ project, node, selected, inActiveProcess, connecting, activeProcess, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeProps) {
+export function SystemNode({ project, node, selected, inActiveProcess, connectionMode, connecting, activeProcess, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   return (
@@ -91,7 +92,7 @@ export function SystemNode({ project, node, selected, inActiveProcess, connectin
     const index = sameSide.findIndex((item) => item.id === port.id);
     const position = `${(port.offset ?? (index + 1) / (sameSide.length + 1)) * 100}%`;
     const style: CSSProperties & { "--port-color": string } = { "--port-color": capabilityConfig[port.capability].color, width: port.width ?? 92, height: port.height ?? 34, ...(side === "left" || side === "right" ? { top: position } : { left: position }) };
-    return <button key={port.id} className={`port node-port side-${side} ${connecting ? "target-ready" : ""} ${connecting?.portId === port.id ? "source-active" : ""}`} style={style} onPointerDown={(event) => { if (!selected) event.currentTarget.dataset.selectOnly = "true"; onBeginPortDrag(event, node, port); }} onClick={(event) => { if (event.currentTarget.dataset.selectOnly) { delete event.currentTarget.dataset.selectOnly; return; } if (!event.currentTarget.dataset.suppressClick) onPortClick(node, port); }} title={`${port.capability} ${port.subtype}`}><span className="port-copy"><strong>{port.name}</strong>{port.secondaryIdentifier && <small>{port.secondaryIdentifier}</small>}</span><i />{selected && <span className="port-resize-handle" onPointerDown={(event) => onBeginPortResize(event, node, port)} />}</button>;
+    return <button key={port.id} className={`port node-port side-${side} ${connectionMode ? "target-ready" : ""} ${connecting?.portId === port.id ? "source-active" : ""}`} style={style} onPointerDown={(event) => { if (connectionMode) { event.stopPropagation(); return; } if (!selected) event.currentTarget.dataset.selectOnly = "true"; onBeginPortDrag(event, node, port); }} onClick={(event) => { if (event.currentTarget.dataset.selectOnly) { delete event.currentTarget.dataset.selectOnly; return; } if (!event.currentTarget.dataset.suppressClick) onPortClick(node, port); }} title={`${port.capability} ${port.subtype}`}><span className="port-copy"><strong>{port.name}</strong>{port.secondaryIdentifier && <small>{port.secondaryIdentifier}</small>}</span><i />{selected && !connectionMode && <span className="port-resize-handle" onPointerDown={(event) => onBeginPortResize(event, node, port)} />}</button>;
   })
 }
 { selected && <button className="resize-handle" onPointerDown={(event) => onBeginResize(event, node)} aria-label={`Resize ${node.name}`} /> }

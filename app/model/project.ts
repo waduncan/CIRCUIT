@@ -3,7 +3,7 @@ import { cloneCompositeContent, cloneCompositeTemplate, defaultCompositeTemplate
 import { reconcileNestedNodes } from "./nesting";
 
 export const GRID = 16;
-export const STORAGE_KEY = "careflow-studio-project-v1";
+export const STORAGE_KEY = "circuit-studio-project-v1";
 export const DEFAULT_CANVAS: CanvasSettings = { mode: "bounded", width: 2400, height: 1600 };
 export const defaultConnectionStyle = (): NonNullable<Connection["style"]> => ({ lineStyle: "solid", width: 2.4, opacity: 0.72, arrowStyle: "none" });
 export const defaultConnectionRouting = (): NonNullable<Connection["routing"]> => ({ trunkPoints: [], parallelOffset: 0, crossingStyle: "bridge", zIndex: 0 });

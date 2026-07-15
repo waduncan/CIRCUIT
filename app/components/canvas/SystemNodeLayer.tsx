@@ -7,6 +7,7 @@ import { SystemNode as SystemNodeRenderer } from "./SystemNode";
 type SystemNodeLayerProps = {
   project: Project;
   selection: Selection;
+  connectionMode: boolean;
   connecting: { nodeId: string; portId: string } | null;
   activeRoute: string[];
   activeProcess?: DataFlowProcess;
@@ -18,7 +19,7 @@ type SystemNodeLayerProps = {
   onBeginPortResize: (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => void;
 };
 
-export function SystemNodeLayer({ project, selection, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
+export function SystemNodeLayer({ project, selection, connectionMode, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
   return (
     <>
       {[...project.nodes].sort((a, b) => (a.kind === "nestable" ? -1 : 0) - (b.kind === "nestable" ? -1 : 0)).map((node) => {
@@ -34,6 +35,7 @@ export function SystemNodeLayer({ project, selection, connecting, activeRoute, a
                 node={node} 
                 selected={selected} 
                 inActiveProcess={inActiveProcess} 
+                connectionMode={connectionMode}
                 connecting={connecting} 
                 activeProcess={activeProcess} 
                 onBeginNodeDrag={onBeginNodeDrag} 
