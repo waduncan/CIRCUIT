@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import DiagramApp from "./app/DiagramApp";
+import {TooltipProvider} from "@/app/components/ui/tooltip";
 //@ts-ignore
 import "./app/globals.css";
 
@@ -14,6 +15,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <DiagramApp />
+    <TooltipProvider delay={400}>
+      <DiagramApp />
+    </TooltipProvider>
   </StrictMode>,
 );

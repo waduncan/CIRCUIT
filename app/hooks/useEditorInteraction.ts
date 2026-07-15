@@ -6,6 +6,8 @@ export function useEditorInteraction() {
   const [connectionMode, setConnectionMode] = useState(false);
   const [connecting, setConnecting] = useState<{ nodeId: string; portId: string } | null>(null);
   const [modifierKeys, setModifierKeys] = useState({ ctrl: false, shift: false });
+  const [panning, setPanning] = useState<boolean>(false);
+
 
   useEffect(() => {
     const updateModifiers = (event: KeyboardEvent) => setModifierKeys({ ctrl: event.ctrlKey, shift: event.shiftKey });
@@ -20,5 +22,5 @@ export function useEditorInteraction() {
     };
   }, []);
 
-  return { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys };
+  return { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys, panning, setPanning };
 }

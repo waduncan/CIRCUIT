@@ -5,13 +5,12 @@ import type { Point, Port, Project, SystemNode } from "./types";
 
 export type ConnectionPortTarget = { node: SystemNode; port: Port; distance: number };
 
-export function nearestEligibleConnectionPort(
+export function nearestConnectionPort(
   project: Project,
   point: Point,
   radius: number,
   source: { nodeId: string; portId: string } | null,
 ): ConnectionPortTarget | null {
-  const sourcePort = source ? getProjectObject(project, "port", source.portId) : undefined;
   const targets: ConnectionPortTarget[] = [];
 
   for (const node of project.nodes) {
@@ -19,9 +18,7 @@ export function nearestEligibleConnectionPort(
       const visible = !node.nestedParentId || project.connections.some(
         (connection) => connection.sourcePortId === port.id || connection.targetPortId === port.id,
       );
-      const eligible = sourcePort
-        ? port.direction === "inbound" && portsAreCompatible(sourcePort, port)
-        : port.direction === "outbound";
+      const eligible = source ? port.direction === "inbound" : port.direction === "outbound";
       if (!visible || !eligible) continue;
 
       const position = portPosition(project, node.id, port.id);
@@ -31,4 +28,17 @@ export function nearestEligibleConnectionPort(
   }
 
   return targets.sort((a, b) => a.distance - b.distance || a.port.id.localeCompare(b.port.id))[0] ?? null;
+}
+
+export function nearestEligibleConnectionPort(
+  project: Project,
+  point: Point,
+  radius: number,
+  source: { nodeId: string; portId: string } | null,
+): ConnectionPortTarget | null {
+  const target = nearestConnectionPort(project, point, radius, source);
+  const sourcePort = source ? getProjectObject(project, "port", source.portId) : undefined;
+  if (!target) return null;
+  const eligible = !sourcePort || (target.port.direction === "inbound" && portsAreCompatible(sourcePort, target.port));
+  return eligible ? target : null;
 }

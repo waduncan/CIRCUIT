@@ -16,6 +16,7 @@ type ConnectionLayerProps = {
   zoom: number;
   renderBounds: Bounds;
   viewportBounds: Bounds;
+  preview?: { points: Point[]; invalid: boolean; color: string } | null;
   onSelect: (connectionId: string) => void;
   onAddBend: (connection: Connection, point: Point) => void;
   onBeginBendDrag: (event: ReactPointerEvent<SVGCircleElement>, connection: Connection, pointIndex: number) => void;
@@ -50,6 +51,7 @@ export function ConnectionLayer({
   zoom,
   renderBounds,
   viewportBounds,
+  preview,
   onSelect,
   onAddBend,
   onBeginBendDrag,
@@ -163,6 +165,7 @@ export function ConnectionLayer({
           </g>
         );
       })}
+      {preview && <path className={`connection-preview ${preview.invalid ? "invalid" : ""}`} d={svgPath(preview.points)} style={{ "--preview-color": preview.color } as CSSProperties} />}
     </svg>
   );
 }
