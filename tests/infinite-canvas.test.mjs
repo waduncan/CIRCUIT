@@ -28,6 +28,9 @@ test("supports cursor-centered zoom and fit controls", async () => {
   assert.match(viewport, /MAX_ZOOM\s*=\s*4/);
   assert.match(viewport, /function screenToCanvasPoint/);
   assert.match(viewport, /local\.x - canvasPoint\.x \* nextZoom/);
+  assert.match(viewport, /element\.addEventListener\("wheel", handleWheel, \{ passive: false \}\)/);
+  assert.match(viewport, /if \(event\.ctrlKey \|\| event\.metaKey\)[\s\S]*event\.preventDefault\(\)/);
+  assert.doesNotMatch(viewport, /window\.addEventListener\("wheel"/);
   assert.match(viewport, /fitDocument/);
   assert.match(viewport, /fitBounds/);
   assert.match(viewport, /resetView/);
