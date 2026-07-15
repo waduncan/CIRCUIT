@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { boundsFromContainers, boundsFromNodes, expandBounds, unionBounds } from "../model/viewport";
 import type { Bounds, CanvasSettings, DiagramContainer, Point, SystemNode } from "../model/types";
 
@@ -68,14 +68,32 @@ export function useCanvasViewport({ nodes, containers, canvas, onClearSelection,
     window.addEventListener("pointerup", up);
   }, [onClearSelection, view.pan]);
 
-  const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      zoomAt({ x: event.clientX, y: event.clientY }, view.zoom * Math.exp(-event.deltaY * 0.0015));
-    } else {
+  useEffect(() => {
+    if (!active) return;
+    const element = viewportRef.current;
+    if (!element) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        // This listener must be non-passive so the browser does not page-zoom while
+        // the gesture is over the canvas. Outside this element, native behavior remains.
+        event.preventDefault();
+        const rect = element.getBoundingClientRect();
+        const local = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        setView((current) => {
+          const nextZoom = clampZoom(current.zoom * Math.exp(-event.deltaY * 0.0015));
+          const canvasPoint = { x: (local.x - current.pan.x) / current.zoom, y: (local.y - current.pan.y) / current.zoom };
+          return { zoom: nextZoom, pan: { x: local.x - canvasPoint.x * nextZoom, y: local.y - canvasPoint.y * nextZoom } };
+        });
+        return;
+      }
+
       setView((current) => ({ ...current, pan: { x: current.pan.x - event.deltaX, y: current.pan.y - event.deltaY } }));
-    }
-  }, [view.zoom, zoomAt]);
+    };
+
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [active]);
 
   const fitBounds = useCallback((bounds: Bounds) => {
     if (!bounds.width && !bounds.height) return;
@@ -120,7 +138,6 @@ export function useCanvasViewport({ nodes, containers, canvas, onClearSelection,
     pan: view.pan,
     viewportBounds,
     beginPan,
-    handleWheel,
     fitBounds,
     fitDocument,
     resetView,

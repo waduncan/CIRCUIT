@@ -24,7 +24,7 @@ export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
   const { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys } = useEditorInteraction();
   const [activeView, setActiveView] = useState<"diagram" | "library">("diagram");
-  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, handleWheel, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
+  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
   const [toast, setToast] = useState<string | null>(null);
   const [activeProcessId, setActiveProcessId] = useState<string | null>("proc-order");
   const [isAnimating, setIsAnimating] = useState(true);
@@ -304,7 +304,6 @@ export default function DiagramApp() {
             onPointerDownCapture={handleConnectionPointerDown}
             onClickCapture={(event) => { if (connectionPointerHandledRef.current) { event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = false; } }}
             onPointerDown={beginPan}
-            onWheel={handleWheel}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleCanvasDrop} style={gridBackgroundStyle(pan, zoom)}
           >
