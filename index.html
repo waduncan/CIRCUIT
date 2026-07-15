@@ -9,6 +9,19 @@
     />
     <link rel="icon" href="/favicon.svg" />
     <title>CIRCUIT Studio</title>
+    <script>
+      // Apply the saved (or system) theme before first paint so there is no flash of the
+      // wrong theme on load. Keep in sync with app/hooks/useTheme.ts (key + values).
+      (function () {
+        try {
+          var stored = localStorage.getItem("circuit-theme");
+          var theme = stored === "light" || stored === "dark"
+            ? stored
+            : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
