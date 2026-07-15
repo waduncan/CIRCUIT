@@ -110,6 +110,12 @@ export function useCanvasViewport({ nodes, containers, canvas, onClearSelection,
     });
   }, [viewportSize]);
 
+  // Recenter the viewport on a canvas point while preserving zoom (minimap click/drag navigation,
+  // issue #13). Unlike fitBounds this never changes zoom, so repeated drags don't drift the scale.
+  const panTo = useCallback((center: Point) => {
+    setView((current) => ({ zoom: current.zoom, pan: { x: viewportSize.width / 2 - center.x * current.zoom, y: viewportSize.height / 2 - center.y * current.zoom } }));
+  }, [viewportSize]);
+
   const resetView = useCallback(() => setView({ zoom: 1, pan: { x: 40, y: 40 } }), []);
 
   const fitDocument = useCallback(() => {
@@ -140,6 +146,7 @@ export function useCanvasViewport({ nodes, containers, canvas, onClearSelection,
     beginPan,
     fitBounds,
     fitDocument,
+    panTo,
     resetView,
     zoomIn: () => zoomBy(1.2),
     zoomOut: () => zoomBy(1 / 1.2),

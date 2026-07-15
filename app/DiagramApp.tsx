@@ -5,11 +5,11 @@ import { PropertiesInspector } from "./components/PropertiesInspector"; import {
 import { ObjectLibraryView } from "./components/ObjectLibraryView";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { ContainerLayer } from "./components/canvas/ContainerLayer";
-import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer";
+import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer"; import { Minimap } from "./components/Minimap"; import { DocumentSearch } from "./components/DocumentSearch";
 import { useProjectDocument } from "./hooks/useProjectDocument";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useEditorInteraction } from "./hooks/useEditorInteraction";
-import { useDiagramInteractions } from "./hooks/useDiagramInteractions"; import { getProjectObject } from "./model/projectObject";
+import { useDiagramInteractions } from "./hooks/useDiagramInteractions"; import { getProjectObject } from "./model/projectObject"; import { useDocumentNavigation } from "./hooks/useDocumentNavigation"; import { selectionBreadcrumb } from "./model/search";
 import { useContainerInteractions } from "./hooks/useContainerInteractions";
 import { useConnectionPreview } from "./hooks/useConnectionPreview";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
@@ -25,7 +25,8 @@ export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
   const { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys, panning, setPanning } = useEditorInteraction();
   const [activeView, setActiveView] = useState<"diagram" | "library">("diagram");
-  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
+  const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, fitBounds, fitDocument, panTo, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
+  const nav = useDocumentNavigation({ project, setSelection, fitBounds });
   const [toast, setToast] = useState<string | null>(null);
   const [activeProcessId, setActiveProcessId] = useState<string | null>("proc-order");
   const [isAnimating, setIsAnimating] = useState(true);
@@ -282,7 +283,9 @@ export default function DiagramApp() {
               <div><span className="eyebrow">Build</span><h2>Object library</h2></div>
               <button className="icon-button" onClick={() => setActiveView("library")} aria-label="Manage object library">⚙</button>
             </div>
-            <div className="library-search">⌕ <span>Search systems…</span><kbd>⌘K</kbd></div>
+            <div className="library-search-wrap">{nav.open
+              ? <DocumentSearch project={project} open={nav.open} query={nav.query} setQuery={nav.setQuery} results={nav.results} activeIndex={nav.activeIndex} setActiveIndex={nav.setActiveIndex} focusResult={nav.focusResult} focusActive={nav.focusActive} next={nav.next} previous={nav.previous} closeSearch={nav.closeSearch} />
+              : <button className="library-search" onClick={nav.openSearch}>⌕ <span>Search document…</span><kbd>Ctrl F</kbd></button>}</div>
             <p className="section-label">Healthcare primitives</p>
             <div className="library-list">
               {allLibraryItems.map((item) => (
@@ -307,6 +310,8 @@ export default function DiagramApp() {
               canUndo={canUndo}
               canRedo={canRedo}
               canFitSelection={Boolean(selectionBounds)}
+              breadcrumb={selectionBreadcrumb(project, selection)}
+              onFind={nav.openSearch}
               onSelect={() => {
                 setConnectionMode(false);
                 setConnecting(null);
@@ -411,11 +416,7 @@ export default function DiagramApp() {
 
               </div>
 
-              <div className="minimap">
-                <div className="minimap-label">MAP</div>
-                {project.nodes.map((node) => <i key={node.id} style={{ left: `${Math.min(88, node.x / 18)}%`, top: `${Math.min(78, node.y / 12)}%`, background: node.color }} />)}
-                <div className="minimap-window" />
-              </div>
+              <Minimap nodes={project.nodes} containers={project.containers} canvas={project.canvas} pan={pan} zoom={zoom} viewportRef={canvasRef} panTo={panTo} />
               <div className="canvas-hint">{containerEditing ? "Container mode · Drag or resize locations · " : "Scroll to pan · Ctrl+scroll to zoom at cursor · "}{project.canvas.mode === "infinite" ? "Infinite canvas" : `${project.canvas.width} × ${project.canvas.height}`} · Snap {GRID}px</div>
             </div>
 
