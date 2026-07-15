@@ -34,3 +34,6 @@ yarn-error.log*
 /outputs/
 /work/
 *.tsbuildinfo
+
+# Generated benchmark fixture (regenerate with: node bench/perf.mjs)
+bench/benchmark-500.json
