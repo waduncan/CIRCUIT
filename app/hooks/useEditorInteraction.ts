@@ -3,6 +3,7 @@ import type { Selection } from "../model/types";
 
 export function useEditorInteraction() {
   const [selection, setSelection] = useState<Selection>({ type: "node", id: "app-1" });
+  const [connectionMode, setConnectionMode] = useState(false);
   const [connecting, setConnecting] = useState<{ nodeId: string; portId: string } | null>(null);
   const [modifierKeys, setModifierKeys] = useState({ ctrl: false, shift: false });
 
@@ -19,5 +20,5 @@ export function useEditorInteraction() {
     };
   }, []);
 
-  return { selection, setSelection, connecting, setConnecting, modifierKeys };
+  return { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys };
 }
