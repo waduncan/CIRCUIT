@@ -1,9 +1,19 @@
 import type { CanvasSettings } from "../model/types";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/app/components/ui/tooltip"
+
+import { PiArrowUpRightBold, PiArrowUpLeftBold } from "react-icons/pi";
+
+
 type CanvasToolbarProps = {
   canvas: CanvasSettings;
   zoom: number;
   connecting: boolean;
+  panning: boolean;
   containerEditing: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -24,15 +34,46 @@ type CanvasToolbarProps = {
   onResetView: () => void;
 };
 
+function ToolbarTooltip({
+  label,
+  shortcut,
+  children,
+}: {
+  label: string;
+  shortcut?: string;
+  children: React.ReactElement;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={children} />
+      <TooltipContent>
+        <span>{label}</span>
+        {shortcut && <kbd>{shortcut}</kbd>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function CanvasToolbar(props: CanvasToolbarProps) {
-  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection } = props;
+  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection, panning } = props;
   return (
     <div className="canvas-toolbar">
       <div className="tool-group">
-        <button className={`tool ${!containerEditing ? "active" : ""}`} onClick={props.onSelect} aria-label="Select tool">↖</button>
-        <button className="tool" onClick={props.onPan} aria-label="Pan tool">✋</button>
+
+        <ToolbarTooltip label="Select" shortcut="V">
+          <button className={`tool ${!containerEditing && !panning && !connecting ? "active" : ""}`} onClick={props.onSelect} aria-label="Select tool">
+            <PiArrowUpLeftBold />
+          </button>
+        </ToolbarTooltip>
+
+        <button className={`tool ${panning ? "active" : ""}`} onClick={props.onPan} aria-label="Pan tool">✋</button>
+
         <span className="tool-separator" />
-        <button className={`tool ${connecting ? "active-connect" : ""}`} onClick={props.onConnect} aria-label="Connect tool">↗</button>
+        <ToolbarTooltip label="Connect" shortcut="C">
+          <button className={`tool ${connecting ? "active-connect" : ""}`} onClick={props.onConnect} aria-label="Connect tool">
+            <PiArrowUpRightBold />
+          </button>
+        </ToolbarTooltip>
         <button className="tool" onClick={props.onAddProcess} aria-label="Add process">◎</button>
         <button className={`tool container-tool ${containerEditing ? "active" : ""}`} onClick={props.onToggleContainers} aria-label="Edit containers" title="Container editing mode">▣</button>
         {containerEditing && <button className="tool" onClick={props.onAddContainer} aria-label="Add container" title="Add container">＋</button>}

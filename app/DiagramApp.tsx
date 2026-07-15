@@ -11,18 +11,19 @@ import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useEditorInteraction } from "./hooks/useEditorInteraction";
 import { useDiagramInteractions } from "./hooks/useDiagramInteractions"; import { getProjectObject } from "./model/projectObject";
 import { useContainerInteractions } from "./hooks/useContainerInteractions";
+import { useConnectionPreview } from "./hooks/useConnectionPreview";
 import { capabilityConfig, icons, primitiveLibrary } from "./model/catalog";
 import { cloneCompositeContent, compositeLibraryItems } from "./model/compositeTemplates";
 import { blankProject, calculateProcessRoute, connectionSubtype, createDemoProject, createId, GRID, migrateProjectDocument, portsAreCompatible, snap, withConnectionDefaults } from "./model/project";
 import { connectionRoute, orthogonalRoutePoints } from "./model/routing";
 import { boundsFromContainers, boundsFromNodes, boundsFromPoints, expandBounds, gridBackgroundStyle, nodeBounds, unionBounds } from "./model/viewport";
 import { containerBounds } from "./model/containers";
-import { nearestEligibleConnectionPort } from "./model/connectionHitTest";
+import { nearestConnectionPort } from "./model/connectionHitTest";
 import type { Bounds, Connection, DataFlowProcess as Process, DiagramContainer, LibraryItem, Port, PortDraft, PrimitiveKind, SystemNode } from "./model/types";
 import { downloadJson } from "./utils/download";
 export default function DiagramApp() {
   const { project, setProject, dispatch, undo, redo, canUndo, canRedo } = useProjectDocument();
-  const { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys } = useEditorInteraction();
+  const { selection, setSelection, connectionMode, setConnectionMode, connecting, setConnecting, modifierKeys, panning, setPanning } = useEditorInteraction();
   const [activeView, setActiveView] = useState<"diagram" | "library">("diagram");
   const { viewportRef: canvasRef, zoom, pan, viewportBounds, beginPan, fitBounds, fitDocument, resetView, zoomIn, zoomOut, toCanvasPoint } = useCanvasViewport({ nodes: project.nodes, containers: project.containers, canvas: project.canvas, active: activeView === "diagram", onClearSelection: () => setSelection(null) });
   const [toast, setToast] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export default function DiagramApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
   const connectionPointerHandledRef = useRef(false);
+  const { preview: connectionPreview, handlePointerMove: handleConnectionPointerMove, clearPreview } = useConnectionPreview({ project, connecting, zoom, canvasRef, toCanvasPoint });
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
@@ -109,6 +111,7 @@ export default function DiagramApp() {
         return;
       }
       setConnectionMode(true);
+      setPanning(false);
       setConnecting({ nodeId: node.id, portId: port.id });
       showToast(`Connecting from ${node.name} · ${port.name}`);
       return;
@@ -130,18 +133,20 @@ export default function DiagramApp() {
     }
     const duplicate = project.connections.some((edge) => edge.sourcePortId === sourcePort.id && edge.targetPortId === port.id);
     if (duplicate) { showToast("These ports are already connected."); setConnecting(null); return; }
-    const connection: Connection = withConnectionDefaults({ id: createId("connection"), sourceNodeId: sourceNode.id, sourcePortId: sourcePort.id, targetNodeId: node.id, targetPortId: port.id,
+    const connection: Connection = withConnectionDefaults({
+      id: createId("connection"), sourceNodeId: sourceNode.id, sourcePortId: sourcePort.id, targetNodeId: node.id, targetPortId: port.id,
       capability: sourcePort.capability, subtype: connectionSubtype(sourcePort, port), dataType: "Unassigned data", description: "",
     });
     dispatch({ type: "connection.add", connection });
     setConnecting(null);
+    clearPreview();
     setSelection({ type: "connection", id: connection.id });
     showToast(`${connection.capability} ${connection.subtype} connection created.`);
   };
   const handleConnectionPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!connectionMode || event.button !== 0 || !rect) return;
-    const target = nearestEligibleConnectionPort(project, toCanvasPoint({ x: event.clientX, y: event.clientY }, rect), 28 / zoom, connecting);
+    const target = nearestConnectionPort(project, toCanvasPoint({ x: event.clientX, y: event.clientY }, rect), 28 / zoom, connecting);
     if (!target) return;
     event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = true;
     handlePortClick(target.node, target.port);
@@ -162,7 +167,6 @@ export default function DiagramApp() {
     const point = toCanvasPoint({ x: event.clientX, y: event.clientY }, rect);
     addNodeFromLibrary(item, point.x, point.y);
   };
-
   const addPort = () => {
     if (!selectedNode) return;
     if (!selectedNode.capabilities.includes(portDraft.capability)) {
@@ -180,14 +184,12 @@ export default function DiagramApp() {
     setPortDraft((current) => ({ ...current, name: "", secondaryIdentifier: "" }));
     showToast(`${port.capability} ${port.subtype} port added.`);
   };
-
   const removeSelected = () => {
     if (!selection) return;
     dispatch({ type: "selection.delete", selection });
     setSelection(null);
     showToast("Removed from the project.");
   };
-
   const duplicateNode = (node: SystemNode) => {
     const duplicate: SystemNode = {
       ...node,
@@ -209,7 +211,6 @@ export default function DiagramApp() {
     setSelection({ type: "node", id: duplicate.id });
     showToast(`${duplicate.name} created.`);
   };
-
   const importProject = async (file: File) => {
     try {
       const parsed = migrateProjectDocument(JSON.parse(await file.text()));
@@ -219,7 +220,6 @@ export default function DiagramApp() {
       showToast(`${parsed.name} opened.`);
     } catch { showToast("That file is not a valid circuit project."); }
   };
-
   const importLibrary = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text()) as LibraryItem[];
@@ -254,6 +254,7 @@ export default function DiagramApp() {
 
   return (
     <main className="app-shell">
+
       <header className="topbar">
         <div className="brand-mark">CF</div>
         <div className="brand-copy"><strong>CIRCUIT Studio</strong><span>Healthcare connectivity modeling</span></div>
@@ -274,120 +275,266 @@ export default function DiagramApp() {
         </div>
       </header>
 
-      {activeView === "diagram" ? <div className="workspace">
-        <aside className="library-panel">
-          <div className="panel-heading">
-            <div><span className="eyebrow">Build</span><h2>Object library</h2></div>
-            <button className="icon-button" onClick={() => setActiveView("library")} aria-label="Manage object library">⚙</button>
-          </div>
-          <div className="library-search">⌕ <span>Search systems…</span><kbd>⌘K</kbd></div>
-          <p className="section-label">Healthcare primitives</p>
-          <div className="library-list">
-            {allLibraryItems.map((item) => (
-              <div key={item.id} className="library-card" draggable onDragStart={(event) => event.dataTransfer.setData("application/x-circuit-library", item.id)} onDoubleClick={() => addNodeFromLibrary(item)}>
-                <div className="library-icon" style={{ "--accent": item.color } as React.CSSProperties}>{icons[item.kind]}</div>
-                <div><strong>{item.name}</strong><span>{item.capabilities.join(" · ")}</span></div>
-                <span className="drag-grip">⠿</span>
-              </div>
-            ))}
-          </div>
-          <button className="manage-library" onClick={() => setActiveView("library")}>＋ Create custom object</button>
-          <div className="tip-card"><span>TIP</span><p>Drag an object onto the canvas, then define its capabilities and ports in Properties.</p></div>
-        </aside>
-
-        <section className="canvas-column">
-          <CanvasToolbar canvas={project.canvas} zoom={zoom} connecting={connectionMode} containerEditing={containerEditing} canUndo={canUndo} canRedo={canRedo} canFitSelection={Boolean(selectionBounds)} onSelect={() => { setConnectionMode(false); setConnecting(null); setContainerEditing(false); if (selection?.type === "container") setSelection(null); }} onPan={() => { setConnectionMode(false); setConnecting(null); }} onConnect={() => { setConnectionMode(true); setConnecting(null); showToast("Click an outbound port, then a compatible inbound port."); }} onAddProcess={addProcess} onToggleContainers={() => { setConnectionMode(false); setContainerEditing((value) => !value); setConnecting(null); setSelection(null); }} onAddContainer={addContainer} onUndo={undo} onRedo={redo} onUpdateCanvas={(patch) => dispatch({ type: "canvas.update", patch })} onZoomOut={zoomOut} onZoomIn={zoomIn} onFitDocument={fitDocument} onFitSelection={() => selectionBounds && fitBounds(selectionBounds)} onResetView={resetView} />
-
-          <div
-            className={`canvas-viewport ${connectionMode ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""} ${zoom < 0.6 ? "grid-hide-minor" : ""}`}
-            ref={canvasRef}
-            onPointerDownCapture={handleConnectionPointerDown}
-            onClickCapture={(event) => { if (connectionPointerHandledRef.current) { event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = false; } }}
-            onPointerDown={beginPan}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleCanvasDrop} style={gridBackgroundStyle(pan, zoom)}
-          >
-            <div className={`diagram-surface ${project.canvas.mode}`} style={{ width: Math.max(project.canvas.width, renderBounds.x + renderBounds.width), height: Math.max(project.canvas.height, renderBounds.y + renderBounds.height), transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-              <ContainerLayer containers={project.containers} selection={selection} editing={containerEditing} viewportBounds={viewportBounds} onSelect={(containerId) => setSelection({ type: "container", id: containerId })} onBeginDrag={beginContainerDrag} onBeginResize={beginContainerResize} />
-              <ConnectionLayer
-                project={project}
-                selection={selection}
-                activeRoute={activeRoute}
-                activeProcess={activeProcess}
-                isAnimating={isAnimating}
-                canvasRef={canvasRef}
-                pan={pan}
-                zoom={zoom}
-                renderBounds={renderBounds}
-                viewportBounds={viewportBounds}
-                onSelect={(connectionId) => setSelection({ type: "connection", id: connectionId })}
-                onAddBend={addBendPoint}
-                onBeginBendDrag={beginBendDrag}
-                onBeginSegmentDrag={beginSegmentDrag}
-                onRemoveBend={(connection, pointIndex, routePoints) => {
-                  const remaining = routePoints.slice(1, -1).filter((_, index) => index !== pointIndex);
-                  saveRoute(connection, orthogonalRoutePoints(routePoints[0], routePoints.at(-1)!, remaining));
-                  showToast(`Bend point ${pointIndex + 1} removed.`);
-                }}
-                onUpdateConnection={updateConnection} />
-              <SystemNodeLayer project={project} selection={selection} connectionMode={connectionMode} connecting={connecting} activeRoute={activeRoute} activeProcess={activeProcess} viewportBounds={viewportBounds} onBeginNodeDrag={beginNodeDrag} onBeginResize={beginResize} onPortClick={handlePortClick} onBeginPortDrag={beginPortDrag} onBeginPortResize={beginPortResize} />
+      {activeView === "diagram" ? 
+        <div className="workspace">
+          <aside className="library-panel">
+            <div className="panel-heading">
+              <div><span className="eyebrow">Build</span><h2>Object library</h2></div>
+              <button className="icon-button" onClick={() => setActiveView("library")} aria-label="Manage object library">⚙</button>
             </div>
-
-            <div className="minimap">
-              <div className="minimap-label">MAP</div>
-              {project.nodes.map((node) => <i key={node.id} style={{ left: `${Math.min(88, node.x / 18)}%`, top: `${Math.min(78, node.y / 12)}%`, background: node.color }} />)}
-              <div className="minimap-window" />
-            </div>
-            <div className="canvas-hint">{containerEditing ? "Container mode · Drag or resize locations · " : "Scroll to pan · Ctrl+scroll to zoom at cursor · "}{project.canvas.mode === "infinite" ? "Infinite canvas" : `${project.canvas.width} × ${project.canvas.height}`} · Snap {GRID}px</div>
-          </div>
-
-          <div className={`process-tray ${processOpen ? "open" : ""}`}>
-            <button className="tray-toggle" onClick={() => setProcessOpen((value) => !value)}><span>Data flow processes</span><b>{project.processes.length}</b><i>{processOpen ? "⌄" : "⌃"}</i></button>
-            {processOpen && (
-              <div className="process-content">
-                <div className="process-tabs">
-                  {project.processes.map((process) => (
-                    <button key={process.id} className={activeProcessId === process.id ? "active" : ""} onClick={() => { setActiveProcessId(process.id); setSelection({ type: "process", id: process.id }); }}><i style={{ background: process.color }} />{process.name}</button>
-                  ))}
-                  <button className="add-process" onClick={addProcess}>＋</button>
+            <div className="library-search">⌕ <span>Search systems…</span><kbd>⌘K</kbd></div>
+            <p className="section-label">Healthcare primitives</p>
+            <div className="library-list">
+              {allLibraryItems.map((item) => (
+                <div key={item.id} className="library-card" draggable onDragStart={(event) => event.dataTransfer.setData("application/x-circuit-library", item.id)} onDoubleClick={() => addNodeFromLibrary(item)}>
+                  <div className="library-icon" style={{ "--accent": item.color } as React.CSSProperties}>{icons[item.kind]}</div>
+                  <div><strong>{item.name}</strong><span>{item.capabilities.join(" · ")}</span></div>
+                  <span className="drag-grip">⠿</span>
                 </div>
-                {activeProcess && (
-                  <div className="process-summary">
-                    <button className={`play-button ${isAnimating ? "playing" : ""}`} onClick={() => setIsAnimating((value) => !value)}>{isAnimating ? "Ⅱ" : "▶"}</button>
-                    <div className="process-copy"><strong>{activeProcess.name}</strong><span>{activeProcess.description}</span></div>
-                    <div className="route-points">
-                      {activeProcess.checkpoints.map((nodeId, index) => <span key={`${nodeId}-${index}`}>{getProjectObject(project, "node", nodeId)?.name ?? "Missing point"}{index < activeProcess.checkpoints.length - 1 && <i>→</i>}</span>)}
-                    </div>
-                    <div className={`route-status ${activeRoute.length ? "valid" : "invalid"}`}><i />{activeRoute.length ? `${activeRoute.length} connection${activeRoute.length === 1 ? "" : "s"} routed` : "No valid route"}</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
+              ))}
+            </div>
+            <button className="manage-library" onClick={() => setActiveView("library")}>＋ Create custom object</button>
+            <div className="tip-card"><span>TIP</span><p>Drag an object onto the canvas, then define its capabilities and ports in Properties.</p></div>
+          </aside>
 
-        <PropertiesInspector
-          project={project}
-          selection={selection}
-          portDraft={portDraft}
-          setPortDraft={setPortDraft}
-          onDelete={removeSelected}
-          onAddPort={addPort}
-          onDuplicateNode={duplicateNode}
-          onAddCheckpoint={addCheckpoint}
-          onActivateProcess={(processId) => { setActiveProcessId(processId); setIsAnimating(true); }}
-          onUpdateNode={updateNode}
-          onUpdateContainer={updateContainer}
-          onUpdateConnection={updateConnection}
-          onUpdateProcess={updateProcess}
-        />
-      </div> : <ObjectLibraryView items={allLibraryItems} customItems={project.customLibrary} newTemplateName={newTemplateName} newTemplateKind={newTemplateKind} libraryInputRef={libraryInputRef} onTemplateNameChange={setNewTemplateName} onTemplateKindChange={setNewTemplateKind} onCreateTemplate={createTemplate} onRemoveTemplate={(id) => dispatch({ type: "library.remove", id })} onExportLibrary={() => downloadJson(project.customLibrary, "circuit-object-library.json")} onImportLibrary={importLibrary} onReturnToDiagram={() => setActiveView("diagram")} />}
+          <section className="canvas-column">
+            <CanvasToolbar
+              canvas={project.canvas}
+              zoom={zoom}
+              connecting={connectionMode}
+              panning={panning}
+              containerEditing={containerEditing}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              canFitSelection={Boolean(selectionBounds)}
+              onSelect={() => {
+                setConnectionMode(false);
+                setConnecting(null);
+                clearPreview();
+                setPanning(false);
+                setContainerEditing(false);
+                if (selection?.type === "container") {
+                  setSelection(null);
+                }
+              } }
+              onPan={() => {
+                setConnectionMode(false);
+                setConnecting(null);
+                clearPreview();
+                setPanning(true);
+              } }
+              onConnect={() => {
+                setConnectionMode(true);
+                setConnecting(null);
+                clearPreview();
+                setPanning(false);
+                showToast("Click an outbound port, then a compatible inbound port.");
+              } }
+              onAddProcess={addProcess}
+              onToggleContainers={() => {
+                setConnectionMode(false);
+                setContainerEditing((value) => !value);
+                setConnecting(null);
+                clearPreview();
+                setPanning(false);
+                setSelection(null);
+              } }
+              onAddContainer={addContainer}
+              onUndo={undo}
+              onRedo={redo}
+              onUpdateCanvas={(patch) => dispatch({ type: "canvas.update", patch })}
+              onZoomOut={zoomOut}
+              onZoomIn={zoomIn}
+              onFitDocument={fitDocument}
+              onFitSelection={() => selectionBounds && fitBounds(selectionBounds)} onResetView={resetView} 
+              />
+
+            <div
+              className={`canvas-viewport ${connectionMode ? "is-connecting" : ""} ${containerEditing ? "container-editing" : ""} ${modifierKeys.ctrl ? "ctrl-modifier" : ""} ${modifierKeys.shift ? "shift-modifier" : ""} ${zoom < 0.6 ? "grid-hide-minor" : ""}`}
+              ref={canvasRef}
+              onPointerDownCapture={handleConnectionPointerDown}
+              onPointerMove={handleConnectionPointerMove}
+              onPointerLeave={clearPreview}
+              onClickCapture={(event) => { if (connectionPointerHandledRef.current) { event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = false; } }}
+              onPointerDown={beginPan}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleCanvasDrop} style={gridBackgroundStyle(pan, zoom)}>
+
+
+              <div
+                className={`diagram-surface ${project.canvas.mode}`}
+                style={{
+                  width: Math.max(project.canvas.width,
+                    renderBounds.x + renderBounds.width),
+                  height: Math.max(project.canvas.height, renderBounds.y + renderBounds.height),
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                }}>
+
+                <ContainerLayer containers={project.containers} selection={selection} editing={containerEditing} viewportBounds={viewportBounds} onSelect={(containerId) => setSelection({ type: "container", id: containerId })} onBeginDrag={beginContainerDrag} onBeginResize={beginContainerResize} />
+                <ConnectionLayer
+                  project={project}
+                  selection={selection}
+                  activeRoute={activeRoute}
+                  activeProcess={activeProcess}
+                  isAnimating={isAnimating}
+                  canvasRef={canvasRef}
+                  pan={pan}
+                  zoom={zoom}
+                  renderBounds={renderBounds}
+                  viewportBounds={viewportBounds}
+                  preview={connectionPreview}
+                  onSelect={(connectionId) => setSelection({ type: "connection", id: connectionId })}
+                  onAddBend={addBendPoint}
+                  onBeginBendDrag={beginBendDrag}
+                  onBeginSegmentDrag={beginSegmentDrag}
+                  onRemoveBend={(connection, pointIndex, routePoints) => {
+                    const remaining = routePoints.slice(1, -1).filter((_, index) => index !== pointIndex);
+                    saveRoute(connection, orthogonalRoutePoints(routePoints[0], routePoints.at(-1)!, remaining));
+                    showToast(`Bend point ${pointIndex + 1} removed.`);
+                  }}
+                  onUpdateConnection={updateConnection} />
+
+                <SystemNodeLayer
+                  project={project}
+                  selection={selection}
+                  connectionMode={connectionMode}
+                  connecting={connecting}
+                  activeRoute={activeRoute}
+                  activeProcess={activeProcess}
+                  viewportBounds={viewportBounds}
+                  onBeginNodeDrag={beginNodeDrag}
+                  onBeginResize={beginResize}
+                  onPortClick={handlePortClick}
+                  onBeginPortDrag={beginPortDrag}
+                  onBeginPortResize={beginPortResize}
+                />
+
+              </div>
+
+              <div className="minimap">
+                <div className="minimap-label">MAP</div>
+                {project.nodes.map((node) => <i key={node.id} style={{ left: `${Math.min(88, node.x / 18)}%`, top: `${Math.min(78, node.y / 12)}%`, background: node.color }} />)}
+                <div className="minimap-window" />
+              </div>
+              <div className="canvas-hint">{containerEditing ? "Container mode · Drag or resize locations · " : "Scroll to pan · Ctrl+scroll to zoom at cursor · "}{project.canvas.mode === "infinite" ? "Infinite canvas" : `${project.canvas.width} × ${project.canvas.height}`} · Snap {GRID}px</div>
+            </div>
+
+            <div className={`process-tray ${processOpen ? "open" : ""}`}>
+              <button className="tray-toggle" onClick={() => setProcessOpen((value) => !value)}><span>Data flow processes</span><b>{project.processes.length}</b><i>{processOpen ? "⌄" : "⌃"}</i></button>
+              {processOpen && (
+                <div className="process-content">
+                  <div className="process-tabs">
+                    {project.processes.map((process) => (
+                      <button key={process.id} className={activeProcessId === process.id ? "active" : ""} onClick={() => { setActiveProcessId(process.id); setSelection({ type: "process", id: process.id }); }}><i style={{ background: process.color }} />{process.name}</button>
+                    ))}
+                    <button className="add-process" onClick={addProcess}>＋</button>
+                  </div>
+                  {activeProcess && (
+                    <div className="process-summary">
+                      <button className={`play-button ${isAnimating ? "playing" : ""}`} onClick={() => setIsAnimating((value) => !value)}>{isAnimating ? "Ⅱ" : "▶"}</button>
+                      <div className="process-copy"><strong>{activeProcess.name}</strong><span>{activeProcess.description}</span></div>
+                      <div className="route-points">
+                        {activeProcess.checkpoints.map((nodeId, index) => <span key={`${nodeId}-${index}`}>{getProjectObject(project, "node", nodeId)?.name ?? "Missing point"}{index < activeProcess.checkpoints.length - 1 && <i>→</i>}</span>)}
+                      </div>
+                      <div className={`route-status ${activeRoute.length ? "valid" : "invalid"}`}><i />{activeRoute.length ? `${activeRoute.length} connection${activeRoute.length === 1 ? "" : "s"} routed` : "No valid route"}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <PropertiesInspector
+            project={project}
+            selection={selection}
+            portDraft={portDraft}
+            setPortDraft={setPortDraft}
+            onDelete={removeSelected}
+            onAddPort={addPort}
+            onDuplicateNode={duplicateNode}
+            onAddCheckpoint={addCheckpoint}
+            onActivateProcess={(processId) => { setActiveProcessId(processId); setIsAnimating(true); }}
+            onUpdateNode={updateNode}
+            onUpdateContainer={updateContainer}
+            onUpdateConnection={updateConnection}
+            onUpdateProcess={updateProcess}
+          />
+        </div> 
+      : 
+        <ObjectLibraryView 
+          items={allLibraryItems} 
+          customItems={project.customLibrary} 
+          newTemplateName={newTemplateName} 
+          newTemplateKind={newTemplateKind} 
+          libraryInputRef={libraryInputRef} 
+          onTemplateNameChange={setNewTemplateName} 
+          onTemplateKindChange={setNewTemplateKind} 
+          onCreateTemplate={createTemplate} 
+          onRemoveTemplate={(id) => dispatch({ type: "library.remove", id })} 
+          onExportLibrary={() => downloadJson(project.customLibrary, "circuit-object-library.json")} 
+          onImportLibrary={importLibrary} 
+          onReturnToDiagram={() => setActiveView("diagram")} 
+          />
+      }
 
       {toast && <div className="toast"><span>i</span>{toast}<button onClick={() => setToast(null)}>×</button></div>}
 
       {newProjectOpen && (
         <div className="modal-backdrop" onPointerDown={(event) => event.target === event.currentTarget && setNewProjectOpen(false)}>
-          <div className="modal project-modal"><div className="modal-header"><div><span className="eyebrow">Project workflow</span><h2>Create or open a project</h2><p>Projects are saved locally and can be moved as JSON files.</p></div><button onClick={() => setNewProjectOpen(false)}>×</button></div><div className="project-modal-body"><div className="new-project-form"><label>Project name<input value={newProjectName} onChange={(event) => setNewProjectName(event.target.value)} /></label><label>Project description<textarea rows={4} placeholder="What systems and workflows will this diagram describe?" value={newProjectDescription} onChange={(event) => setNewProjectDescription(event.target.value)} /></label><button className="button primary full" onClick={() => { setProject(blankProject(newProjectName.trim() || "Untitled project", newProjectDescription)); setSelection(null); setActiveProcessId(null); setNewProjectOpen(false); }}>Create empty project</button></div><div className="project-options"><button onClick={() => { setProject(createDemoProject()); setSelection({ type: "node", id: "app-1" }); setActiveProcessId("proc-order"); setNewProjectOpen(false); }}><span>✦</span><div><strong>Load PACS example</strong><small>Explore a complete order and image workflow.</small></div></button><button onClick={() => fileInputRef.current?.click()}><span>↥</span><div><strong>Open JSON project</strong><small>Continue work from an exported file.</small></div></button><div className="workflow-steps">{["Describe project", "Choose objects", "Build diagram", "Connect ports", "Animate processes"].map((step, index) => <div key={step}><b>{index + 1}</b><span>{step}</span></div>)}</div></div></div></div>
+          <div className="modal project-modal">
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow">Project workflow</span>
+                <h2>Create or open a project</h2>
+                <p>Projects are saved locally and can be moved as JSON files.</p>
+              </div>
+              <button onClick={() => setNewProjectOpen(false)}>×</button>
+            </div>
+            <div className="project-modal-body">
+              <div className="new-project-form">
+                <label>Project name<input value={newProjectName} onChange={(event) => setNewProjectName(event.target.value)} /></label>
+                <label>Project description
+                  <textarea
+                    rows={4}
+                    placeholder="What systems and workflows will this diagram describe?"
+                    value={newProjectDescription}
+                    onChange={(event) => setNewProjectDescription(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="button primary full"
+                  onClick={() => {
+                    setProject(blankProject(newProjectName.trim() || "Untitled project", newProjectDescription));
+                    setSelection(null);
+                    setActiveProcessId(null);
+                    setNewProjectOpen(false);
+                  }}>Create empty project</button>
+              </div>
+              <div className="project-options">
+                <button
+                  onClick={() => {
+                    setProject(createDemoProject());
+                    setSelection({ type: "node", id: "app-1" });
+                    setActiveProcessId("proc-order");
+                    setNewProjectOpen(false);
+                  }}>
+                  <span>✦</span>
+                  <div>
+                    <strong>Load PACS example</strong>
+                    <small>Explore a complete order and image workflow.</small>
+                  </div>
+                </button>
+                <button onClick={() => fileInputRef.current?.click()}><span>↥</span>
+                  <div>
+                    <strong>Open JSON project</strong>
+                    <small>Continue work from an exported file.</small>
+                  </div>
+                </button>
+                <div className="workflow-steps">{["Describe project", "Choose objects", "Build diagram", "Connect ports", "Animate processes"].map((step, index) => <div key={step}><b>{index + 1}</b><span>{step}</span></div>)}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       {exportOpen && <ExportDialog project={project} onClose={() => setExportOpen(false)} onToast={showToast} />}
