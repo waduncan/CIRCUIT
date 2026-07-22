@@ -18,6 +18,8 @@ type CanvasToolbarProps = {
   canUndo: boolean;
   canRedo: boolean;
   canFitSelection: boolean;
+  breadcrumb: string[];
+  onFind: () => void;
   onSelect: () => void;
   onPan: () => void;
   onConnect: () => void;
@@ -55,7 +57,7 @@ function ToolbarTooltip({
 }
 
 export function CanvasToolbar(props: CanvasToolbarProps) {
-  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection, panning } = props;
+  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection, panning, breadcrumb } = props;
   return (
     <div className="canvas-toolbar">
       <div className="tool-group">
@@ -80,8 +82,12 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <span className="tool-separator" />
         <button className="tool" onClick={props.onUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">↺</button>
         <button className="tool" onClick={props.onRedo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">↻</button>
+        <span className="tool-separator" />
+        <button className="tool" onClick={props.onFind} aria-label="Find in document" title="Find (Ctrl+F)">⌕</button>
       </div>
-      <div className="canvas-crumb"><span>Logical Diagram</span><b>/</b><strong>Primary View</strong></div>
+      <div className="canvas-crumb">{breadcrumb.length
+        ? breadcrumb.map((crumb, index) => <span key={`${crumb}-${index}`}>{index > 0 && <b>/</b>}{index === breadcrumb.length - 1 ? <strong>{crumb}</strong> : crumb}</span>)
+        : <><span>Logical Diagram</span><b>/</b><strong>Primary View</strong></>}</div>
       <div className="canvas-config">
         <select aria-label="Canvas mode" value={canvas.mode} onChange={(event) => props.onUpdateCanvas({ mode: event.target.value as CanvasSettings["mode"] })}><option value="bounded">Bounded</option><option value="infinite">Infinite</option></select>
         {canvas.mode === "bounded" && <><input aria-label="Canvas width" type="number" min="640" step="100" value={canvas.width} onChange={(event) => props.onUpdateCanvas({ width: Math.max(1, Number(event.target.value)) })} onBlur={() => props.onUpdateCanvas({ width: Math.max(640, canvas.width) })} /><span>×</span><input aria-label="Canvas height" type="number" min="480" step="100" value={canvas.height} onChange={(event) => props.onUpdateCanvas({ height: Math.max(1, Number(event.target.value)) })} onBlur={() => props.onUpdateCanvas({ height: Math.max(480, canvas.height) })} /></>}
