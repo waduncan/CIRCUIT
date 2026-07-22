@@ -3,6 +3,7 @@ import { ExportDialog } from "./components/ExportDialog";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
 import { ObjectLibraryView } from "./components/ObjectLibraryView";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { ContainerLayer } from "./components/canvas/ContainerLayer";
 import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer"; import { Minimap } from "./components/Minimap"; import { DocumentSearch } from "./components/DocumentSearch";
@@ -269,6 +270,7 @@ export default function DiagramApp() {
         </nav>
         {activeView === "diagram" && <label className="presentation-toggle"><span>Clean</span><Switch checked={project.presentation === "detailed"} onCheckedChange={(checked) => dispatch({ type: "presentation.update", presentation: checked ? "detailed" : "clean" })} aria-label="Toggle detailed object view" /><span>Detailed</span></label>}
         <div className="topbar-actions">
+          <ThemeToggle />
           <button className="button ghost" onClick={() => fileInputRef.current?.click()}>Open JSON</button>
           <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={(event) => event.target.files?.[0] && importProject(event.target.files[0])} />
           <button className="button ghost" onClick={() => setExportOpen(true)}>Export</button>

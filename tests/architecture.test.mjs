@@ -10,6 +10,8 @@ test("keeps the application shell focused on orchestration", async () => {
   // The shell orchestrates hooks + view layers only. The cap grew from 400 to 600 after the
   // connection-preview work (#46) legitimately expanded the orchestration surface past 543 lines;
   // it still guards against the shell absorbing model/rendering logic that belongs in other files.
+  // connection-preview work (#46) expanded the orchestration surface past 543 lines; it still
+  // guards against the shell absorbing model/rendering logic that belongs in other files.
   assert.ok(source.split(/\r?\n/).length < 600, "DiagramApp should remain smaller than 600 lines");
   assert.match(source, /useProjectDocument/);
   assert.match(source, /useCanvasViewport/);
