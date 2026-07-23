@@ -569,3 +569,156 @@ button.library-search:hover { border-color: #c4d0da; color: #566573; }
 .minimap { cursor: pointer; }
 .minimap-area { position: absolute; border-radius: 2px; opacity: .18; }
 .minimap-window { transition: none; pointer-events: none; }
+
+/* ============================================================================
+   Dark theme (issue #49). Additive override layer keyed on <html data-theme>.
+   The light theme above is the untouched default; these rules only apply in dark.
+   ========================================================================== */
+:root[data-theme="dark"] {
+  --ink: #e7edf4;
+  --muted: #93a3b5;
+  --line: #2a3543;
+  --panel: #151b26;
+  --shadow: 0 16px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* Base + shell */
+:root[data-theme="dark"] body { background: #0d121b; }
+:root[data-theme="dark"] .app-shell { background: #0d121b; }
+
+/* Top bar, brand, workspace nav */
+:root[data-theme="dark"] .topbar { background: #121926; border-bottom-color: #232e3c; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+:root[data-theme="dark"] .project-title-button:hover { background: #1b2532; }
+:root[data-theme="dark"] .workspace-navigation { background: #0f1622; }
+:root[data-theme="dark"] .workspace-navigation button { color: #93a3b5; }
+:root[data-theme="dark"] .workspace-navigation button:hover { background: #1b2532; color: #d3dde8; }
+:root[data-theme="dark"] .workspace-navigation button.active { background: #1e2938; color: #eaf0f6; }
+:root[data-theme="dark"] .button.ghost { background: #182130; border-color: #2a3543; color: #c3ceda; }
+:root[data-theme="dark"] .button.ghost:hover { background: #212c3c; }
+
+/* Panels + library */
+:root[data-theme="dark"] .library-panel, :root[data-theme="dark"] .properties-panel { background: #101724; }
+:root[data-theme="dark"] .icon-button { background: #182130; border-color: #2a3543; color: #a8b6c4; }
+:root[data-theme="dark"] .library-search, :root[data-theme="dark"] button.library-search { background: #151d2a; border-color: #2a3543; color: #93a3b5; }
+:root[data-theme="dark"] .library-search kbd { background: #0f1622; border-color: #2a3543; color: #8493a4; }
+:root[data-theme="dark"] .library-card { background: #161f2c; border-color: #29333f; }
+:root[data-theme="dark"] .library-card:hover { border-color: #3a4759; background: #1a2432; }
+:root[data-theme="dark"] .library-card strong { color: #e7edf4; }
+:root[data-theme="dark"] .manage-library { background: #141c28; border-color: #37475a; color: #9fb1c4; }
+:root[data-theme="dark"] .tip-card { background: #14203a; border-color: #26375a; }
+
+/* Canvas + toolbar + grid */
+:root[data-theme="dark"] .canvas-viewport { background-color: #0a0f17; background-image: linear-gradient(#1a2432 1px, transparent 1px), linear-gradient(90deg, #1a2432 1px, transparent 1px), linear-gradient(#12161f 1px, transparent 1px), linear-gradient(90deg, #12161f 1px, transparent 1px); }
+:root[data-theme="dark"] .canvas-viewport.grid-hide-minor { background-image: linear-gradient(#1a2432 1px, transparent 1px), linear-gradient(90deg, #1a2432 1px, transparent 1px); }
+:root[data-theme="dark"] .canvas-toolbar { background: rgba(18,25,38,.96); border-bottom-color: #2a3543; }
+:root[data-theme="dark"] .canvas-crumb { color: #8291a2; }
+:root[data-theme="dark"] .canvas-crumb strong { color: #cad5e0; }
+:root[data-theme="dark"] .tool { color: #b3c0cd; }
+:root[data-theme="dark"] .tool:hover { background: #1c2634; }
+:root[data-theme="dark"] .canvas-config select, :root[data-theme="dark"] .canvas-config input, :root[data-theme="dark"] .zoom-controls { background: #161f2c; border-color: #2a3543; color: #c3ceda; }
+:root[data-theme="dark"] .zoom-controls button:hover, :root[data-theme="dark"] .fit-button:hover { background: #212c3c; }
+:root[data-theme="dark"] .diagram-surface.bounded { background: rgba(26,34,48,.5); box-shadow: 0 0 0 1px rgba(120,140,165,.14), 0 12px 36px rgba(0,0,0,.35); }
+
+/* Nodes + composite + minimap + hint */
+:root[data-theme="dark"] .system-node { background: #171f2d; border-color: #313d4d; box-shadow: 0 7px 20px rgba(0,0,0,.4); }
+:root[data-theme="dark"] .system-node strong, :root[data-theme="dark"] .node-header strong { color: #e7edf4; }
+:root[data-theme="dark"] .composite-body, :root[data-theme="dark"] .popover-composite-body { background: #131a26; border-color: #29333f; }
+:root[data-theme="dark"] .composite-endpoints > div { background: #101724; border-color: #29333f; }
+:root[data-theme="dark"] .minimap { background: rgba(17,24,35,.9); border-color: #2c3746; }
+:root[data-theme="dark"] .canvas-hint { background: rgba(17,24,35,.85); color: #8f9caa; }
+:root[data-theme="dark"] .empty-canvas { color: #8291a2; }
+
+/* Process tray */
+:root[data-theme="dark"] .process-tray { background: #121926; border-top-color: #2a3543; }
+:root[data-theme="dark"] .tray-toggle { background: #121926; color: #a1b0be; }
+:root[data-theme="dark"] .tray-toggle b { background: #1c2634; color: #93a3b5; }
+:root[data-theme="dark"] .process-tabs { background: #0f1622; }
+:root[data-theme="dark"] .process-tabs button.active { background: #1a2230; color: #dbe4ee; border-color: #313d4d; }
+
+/* Properties inspector */
+:root[data-theme="dark"] .properties-heading { background: rgba(18,25,38,.96); border-bottom-color: #2a3543; }
+:root[data-theme="dark"] .selection-summary { background: #131a26; border-bottom-color: #2a3543; }
+:root[data-theme="dark"] .property-section h3 span { background: #1c2634; color: #93a3b5; }
+:root[data-theme="dark"] .property-section input:not([type="color"]), :root[data-theme="dark"] .property-section textarea, :root[data-theme="dark"] .property-section select, :root[data-theme="dark"] .template-builder input, :root[data-theme="dark"] .template-builder select, :root[data-theme="dark"] .new-project-form input, :root[data-theme="dark"] .new-project-form textarea { background: #161f2c; border-color: #2a3543; color: #dbe4ee; }
+:root[data-theme="dark"] .color-field { background: #161f2c; border-color: #2a3543; }
+:root[data-theme="dark"] .capability-picker button { background: #161f2c; border-color: #2a3543; color: #a4b3c2; }
+:root[data-theme="dark"] .add-port-box { background: #131a26; border-color: #37475a; }
+:root[data-theme="dark"] .port-layout-editor, :root[data-theme="dark"] .composite-editor-section, :root[data-theme="dark"] .semantic-lock, :root[data-theme="dark"] .connection-label-editor { background: #131a26; border-color: #29333f; }
+:root[data-theme="dark"] .container-member { background: #131a26; border-color: #29333f; color: #a4b3c2; }
+
+/* Dialogs, template cards, object library, toasts */
+:root[data-theme="dark"] .modal-backdrop { background: rgba(4,8,14,.62); }
+:root[data-theme="dark"] .modal { background: #141c28; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+:root[data-theme="dark"] .modal-header > button { background: #182130; border-color: #2a3543; color: #a8b6c4; }
+:root[data-theme="dark"] .template-grid { background: #0f1622; }
+:root[data-theme="dark"] .template-card { background: #161f2c; border-color: #29333f; }
+:root[data-theme="dark"] .object-library-view { background: #0d1420; }
+:root[data-theme="dark"] .library-view-header { background: #121926; border-bottom-color: #232e3c; }
+:root[data-theme="dark"] .library-catalog-toolbar { background: #101724; border-bottom-color: #29333f; }
+:root[data-theme="dark"] .toast { background: #1a2432; border-color: #313d4d; color: #e7edf4; }
+
+/* Theme toggle control */
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; color: #8795a3; font-size: 13px; }
+:root[data-theme="dark"] .theme-toggle { color: #93a3b5; }
+
+/* Dark theme — accent states, node-internal tints, and text legibility (issue #49) */
+:root[data-theme="dark"] .tool:hover:not(:disabled), :root[data-theme="dark"] .tool.active { color: #7aa6ff; background: #1a2740; }
+:root[data-theme="dark"] .button.secondary { background: #182747; border-color: #2f4a7d; color: #8fb0ff; }
+:root[data-theme="dark"] .delete-button, :root[data-theme="dark"] .template-card > button { background: #3a1f24; color: #ff8a94; }
+
+/* Node-internal tints: re-mix against a dark base instead of white so they read on dark cards */
+:root[data-theme="dark"] .library-icon { background: color-mix(in srgb, var(--accent) 24%, #141c28); border-color: color-mix(in srgb, var(--accent) 34%, #141c28); }
+:root[data-theme="dark"] .node-icon { background: color-mix(in srgb, var(--node-accent) 24%, #141c28); border-color: color-mix(in srgb, var(--node-accent) 34%, #141c28); }
+:root[data-theme="dark"] .capability-row span { background: color-mix(in srgb, var(--cap) 22%, #141c28); border-color: color-mix(in srgb, var(--cap) 32%, #141c28); }
+:root[data-theme="dark"] .port { background: color-mix(in srgb, var(--port-color) 26%, #141c28); color: #cdd8e3; }
+:root[data-theme="dark"] .system-node.clean-view { background: color-mix(in srgb, var(--node-accent) 16%, #141c28); border-color: color-mix(in srgb, var(--node-accent) 42%, #313d4d); }
+:root[data-theme="dark"] .system-node.nested-node { background: color-mix(in srgb, var(--node-accent) 12%, #101724); }
+:root[data-theme="dark"] .nested-node-header { background: color-mix(in srgb, var(--node-accent) 22%, #141c28); border-bottom-color: color-mix(in srgb, var(--node-accent) 32%, #141c28); color: #c3d0dd; }
+:root[data-theme="dark"] .composite-body footer, :root[data-theme="dark"] .popover-composite-body footer { background: color-mix(in srgb, var(--node-accent) 16%, #141c28); border-top-color: color-mix(in srgb, var(--node-accent) 26%, #141c28); color: #9fb0c0; }
+
+/* Node + composite + inspector text legibility */
+:root[data-theme="dark"] .node-header span { color: #93a3b5; }
+:root[data-theme="dark"] .clean-node-body strong { color: #dbe4ee; }
+:root[data-theme="dark"] .composite-section dd, :root[data-theme="dark"] .composite-endpoints strong { color: #c3d0dd; }
+:root[data-theme="dark"] .composite-section dt, :root[data-theme="dark"] .composite-endpoints span, :root[data-theme="dark"] .composite-endpoints small { color: #93a3b5; }
+:root[data-theme="dark"] .composite-section h4 { color: #a8b6c4; }
+:root[data-theme="dark"] .property-section { border-bottom-color: #222c3a; }
+:root[data-theme="dark"] .property-section h3 { color: #a4b3c2; }
+:root[data-theme="dark"] .property-section label { color: #93a3b5; }
+:root[data-theme="dark"] .selection-summary strong, :root[data-theme="dark"] .selection-summary span { color: #cdd8e3; }
+:root[data-theme="dark"] .library-view-search input { color: #dbe4ee; }
+:root[data-theme="dark"] .container-member { color: #a4b3c2; }
+
+/* Dark theme — new-project modal + object library view (issue #49) */
+:root[data-theme="dark"] .project-options { background: #0f1622; }
+:root[data-theme="dark"] .project-options > button { background: #161f2c; border-color: #29333f; }
+:root[data-theme="dark"] .project-options > button:hover { border-color: #3a4d6e; }
+:root[data-theme="dark"] .project-options > button > span { background: #182747; color: #7aa6ff; }
+:root[data-theme="dark"] .project-options strong { color: #dbe4ee; }
+:root[data-theme="dark"] .project-options small { color: #93a3b5; }
+:root[data-theme="dark"] .workflow-steps b { background: #1c2634; color: #93a3b5; }
+:root[data-theme="dark"] .workflow-steps span { color: #93a3b5; }
+:root[data-theme="dark"] .library-view-header h1 { color: #e7edf4; }
+:root[data-theme="dark"] .library-view-header p { color: #93a3b5; }
+:root[data-theme="dark"] .library-view-search { background: #161f2c; border-color: #2a3543; color: #93a3b5; }
+:root[data-theme="dark"] .template-builder { border-left-color: #29333f; }
+:root[data-theme="dark"] .template-builder p, :root[data-theme="dark"] .template-builder label, :root[data-theme="dark"] .new-project-form label { color: #93a3b5; }
+:root[data-theme="dark"] .template-builder hr { border-top-color: #29333f; }
+:root[data-theme="dark"] .template-card i { background: #1c2634; color: #a4b3c2; }
+:root[data-theme="dark"] .library-view-builder { background: #101724; border-left-color: #29333f; }
+:root[data-theme="dark"] .library-view-builder h2 { color: #e7edf4; }
+:root[data-theme="dark"] .library-catalog-toolbar > span { color: #93a3b5; }
+
+/* Dark theme — document search + minimap UI (styles the feature from PR #48 / issue #13).
+   Inert until that PR lands; once both are on main the find bar and results match the dark theme. */
+:root[data-theme="dark"] .doc-find { background: #141c28; border-color: #2a3543; box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .doc-find-input { color: #e7edf4; }
+:root[data-theme="dark"] .doc-find-icon, :root[data-theme="dark"] .doc-find-count, :root[data-theme="dark"] .doc-find-breadcrumb, :root[data-theme="dark"] .doc-find-copy small, :root[data-theme="dark"] .doc-find-empty { color: #93a3b5; }
+:root[data-theme="dark"] .doc-find-field { color: #7a8797; }
+:root[data-theme="dark"] .doc-find-breadcrumb b { color: #5c6675; }
+:root[data-theme="dark"] .doc-find-step, :root[data-theme="dark"] .doc-find-close { background: #1a2230; border-color: #2a3543; color: #a4b3c2; }
+:root[data-theme="dark"] .doc-find-close { border-color: transparent; }
+:root[data-theme="dark"] .doc-find-results { border-top-color: #232c3a; }
+:root[data-theme="dark"] .doc-find-result:hover, :root[data-theme="dark"] .doc-find-result.active { background: #1c2634; }
+:root[data-theme="dark"] .doc-find-copy strong { color: #e7edf4; }
+:root[data-theme="dark"] button.library-search:hover { border-color: #3a4759; color: #b3c0cd; }
