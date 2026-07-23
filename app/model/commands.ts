@@ -20,7 +20,7 @@ export type ProjectCommand =
   | { type: "presentation.update"; presentation: Project["presentation"] }
   | { type: "selection.delete"; selection: Exclude<Selection, null> }
   // Multi-object operations (#10) — each applied as one command so it is a single undo step.
-  | { type: "objects.arrange"; moves: Array<{ type: "node" | "container"; id: string; x: number; y: number }> }
+  | { type: "objects.arrange"; moves: Array<{ type: "node" | "container"; id: string; x: number; y: number; width?: number; height?: number }> }
   | { type: "objects.delete"; refs: SelectionRef[] }
   | { type: "objects.add"; nodes: SystemNode[]; containers: DiagramContainer[] };
 
@@ -94,7 +94,7 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
         const target = targets.get(key("node", node.id));
         if (!target) return node;
         if (node.kind === "nestable") parentDelta.set(node.id, { x: target.x - node.x, y: target.y - node.y });
-        return { ...node, x: target.x, y: target.y };
+        return { ...node, x: target.x, y: target.y, width: target.width ?? node.width, height: target.height ?? node.height };
       });
       const withChildren = moved.map((node) => {
         if (node.nestedParentId && !targets.has(key("node", node.id))) {
@@ -105,7 +105,7 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
       });
       const containers = project.containers.map((container) => {
         const target = targets.get(key("container", container.id));
-        return target ? { ...container, x: target.x, y: target.y } : container;
+        return target ? { ...container, x: target.x, y: target.y, width: target.width ?? container.width, height: target.height ?? container.height } : container;
       });
       return { ...project, containers, nodes: reconcileNodeContainers(reconcileNestedNodes(withChildren), containers) };
     }

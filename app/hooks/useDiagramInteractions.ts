@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type PointerEvent as ReactPointerEvent, typ
 import { createId, snap } from "../model/project";
 import { compactPoints, orthogonalRoutePoints, portPosition, portTilePosition } from "../model/routing";
 import type { ArrangeMove } from "../model/arrange";
+import { groupDragContext, resolveGroupDrag, type Guide } from "../model/guides";
 import type { Connection, Point, Port, PortSide, Project, Selection, SelectionRef, SystemNode } from "../model/types";
 
 type DiagramInteractionOptions = {
@@ -13,10 +14,11 @@ type DiagramInteractionOptions = {
   // Multi-select (#10): resolve the group to move for a pointer-down, and move objects as one command.
   selectAtPointer: (ref: SelectionRef, additive: boolean) => SelectionRef[];
   moveObjects: (moves: ArrangeMove[], coalesceKey?: string) => void;
+  onGuides: (guides: Guide[]) => void;
   showToast: (message: string) => void;
 };
 
-export function useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, selectAtPointer, moveObjects, showToast }: DiagramInteractionOptions) {
+export function useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, selectAtPointer, moveObjects, onGuides, showToast }: DiagramInteractionOptions) {
   const getPortPosition = useCallback((nodeId: string, portId: string) => portPosition(project, nodeId, portId), [project.nodes]);
 
   const saveRoute = useCallback((connection: Connection, routePoints: Point[], coalesceKey?: string) => {
@@ -122,23 +124,20 @@ export function useDiagramInteractions({ project, zoom, setSelection, updateNode
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
     const group = selectAtPointer({ type: "node", id: node.id }, additive);
     if (additive) return; // shift/ctrl-click toggles membership without moving
-    // Capture each group member's origin so the whole selection moves together by one delta.
-    const origins = group.flatMap((ref) => {
-      const object = ref.type === "node" ? project.nodes.find((n) => n.id === ref.id) : project.containers.find((c) => c.id === ref.id);
-      return object ? [{ ref, x: object.x, y: object.y }] : [];
-    });
+    const { origins, bounds, candidates } = groupDragContext(project, group);
     const anchor = origins.find((origin) => origin.ref.type === "node" && origin.ref.id === node.id) ?? origins[0];
+    const snapToGrid = project.canvas.snapToGrid !== false;
     const startX = event.clientX;
     const startY = event.clientY;
     const gestureKey = createId("group-drag");
     const move = (moveEvent: PointerEvent) => {
-      // Snap the grabbed object to the grid, then shift the whole group by that same delta so the
-      // selection's relative positions are preserved exactly.
-      const dx = anchor ? snap(anchor.x + (moveEvent.clientX - startX) / zoom) - anchor.x : 0;
-      const dy = anchor ? snap(anchor.y + (moveEvent.clientY - startY) / zoom) - anchor.y : 0;
+      // Prefer snapping to an alignment guide; else grid-snap the anchor. The whole group shifts by
+      // the same delta, so relative positions are preserved exactly.
+      const { dx, dy, guides } = resolveGroupDrag({ anchor, groupBounds: bounds, rawDx: (moveEvent.clientX - startX) / zoom, rawDy: (moveEvent.clientY - startY) / zoom, candidates, zoom, snapToGrid });
+      onGuides(guides);
       moveObjects(origins.map((origin) => ({ type: origin.ref.type, id: origin.ref.id, x: origin.x + dx, y: origin.y + dy })), gestureKey);
     };
-    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    const up = () => { onGuides([]); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };

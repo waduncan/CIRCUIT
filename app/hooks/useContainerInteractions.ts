@@ -1,6 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createId, snap } from "../model/project";
 import type { ArrangeMove } from "../model/arrange";
+import { groupDragContext, resolveGroupDrag, type Guide } from "../model/guides";
 import type { DiagramContainer, Project, SelectionRef } from "../model/types";
 
 type ContainerInteractionOptions = {
@@ -8,10 +9,11 @@ type ContainerInteractionOptions = {
   zoom: number;
   selectAtPointer: (ref: SelectionRef, additive: boolean) => SelectionRef[];
   moveObjects: (moves: ArrangeMove[], coalesceKey?: string) => void;
+  onGuides: (guides: Guide[]) => void;
   updateContainer: (id: string, patch: Partial<DiagramContainer>, coalesceKey?: string) => void;
 };
 
-export function useContainerInteractions({ project, zoom, selectAtPointer, moveObjects, updateContainer }: ContainerInteractionOptions) {
+export function useContainerInteractions({ project, zoom, selectAtPointer, moveObjects, onGuides, updateContainer }: ContainerInteractionOptions) {
   const beginContainerDrag = (event: ReactPointerEvent<HTMLElement>, container: DiagramContainer) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
     event.stopPropagation();
@@ -19,20 +21,18 @@ export function useContainerInteractions({ project, zoom, selectAtPointer, moveO
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
     const group = selectAtPointer({ type: "container", id: container.id }, additive);
     if (additive) return;
-    const origins = group.flatMap((ref) => {
-      const object = ref.type === "node" ? project.nodes.find((n) => n.id === ref.id) : project.containers.find((c) => c.id === ref.id);
-      return object ? [{ ref, x: object.x, y: object.y }] : [];
-    });
+    const { origins, bounds, candidates } = groupDragContext(project, group);
     const anchor = origins.find((origin) => origin.ref.type === "container" && origin.ref.id === container.id) ?? origins[0];
+    const snapToGrid = project.canvas.snapToGrid !== false;
     const startX = event.clientX;
     const startY = event.clientY;
     const gestureKey = createId("group-drag");
     const move = (moveEvent: PointerEvent) => {
-      const dx = anchor ? snap(anchor.x + (moveEvent.clientX - startX) / zoom) - anchor.x : 0;
-      const dy = anchor ? snap(anchor.y + (moveEvent.clientY - startY) / zoom) - anchor.y : 0;
+      const { dx, dy, guides } = resolveGroupDrag({ anchor, groupBounds: bounds, rawDx: (moveEvent.clientX - startX) / zoom, rawDy: (moveEvent.clientY - startY) / zoom, candidates, zoom, snapToGrid });
+      onGuides(guides);
       moveObjects(origins.map((origin) => ({ type: origin.ref.type, id: origin.ref.id, x: origin.x + dx, y: origin.y + dy })), gestureKey);
     };
-    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    const up = () => { onGuides([]); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };

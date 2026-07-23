@@ -739,3 +739,12 @@ button.library-search:hover { border-color: #c4d0da; color: #566573; }
 :root[data-theme="dark"] .selection-action { color: #a4b3c2; }
 :root[data-theme="dark"] .selection-action:hover:not(:disabled) { background: #1c2740; color: #7aa6ff; }
 :root[data-theme="dark"] .selection-action.danger:hover:not(:disabled) { background: #3a1f24; color: #ff8a94; }
+
+/* Smart guides + group selection/resize (issue #10 phase 3) */
+.smart-guide { position: absolute; z-index: 14; pointer-events: none; }
+.smart-guide.x { width: 1px; background: #f5308c; }
+.smart-guide.y { height: 1px; background: #f5308c; }
+.group-selection { position: absolute; z-index: 13; border: 1px dashed #2f6df6; pointer-events: none; }
+.group-resize-handle { position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px; border-radius: 3px; background: #fff; border: 1.5px solid #2f6df6; cursor: nwse-resize; pointer-events: auto; }
+:root[data-theme="dark"] .group-selection { border-color: #4d82ff; }
+:root[data-theme="dark"] .group-resize-handle { background: #1a2230; border-color: #4d82ff; }

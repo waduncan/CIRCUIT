@@ -19,6 +19,8 @@ type CanvasToolbarProps = {
   canRedo: boolean;
   canFitSelection: boolean;
   breadcrumb: string[];
+  snapToGrid: boolean;
+  onToggleSnap: () => void;
   onFind: () => void;
   onSelect: () => void;
   onPan: () => void;
@@ -57,7 +59,7 @@ function ToolbarTooltip({
 }
 
 export function CanvasToolbar(props: CanvasToolbarProps) {
-  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection, panning, breadcrumb } = props;
+  const { canvas, zoom, connecting, containerEditing, canUndo, canRedo, canFitSelection, panning, breadcrumb, snapToGrid } = props;
   return (
     <div className="canvas-toolbar">
       <div className="tool-group">
@@ -83,6 +85,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button className="tool" onClick={props.onUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">↺</button>
         <button className="tool" onClick={props.onRedo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">↻</button>
         <span className="tool-separator" />
+        <button className={`tool ${snapToGrid ? "active" : ""}`} onClick={props.onToggleSnap} aria-label="Toggle grid snapping" aria-pressed={snapToGrid} title={`Grid snapping: ${snapToGrid ? "on" : "off"}`}>⊞</button>
         <button className="tool" onClick={props.onFind} aria-label="Find in document" title="Find (Ctrl+F)">⌕</button>
       </div>
       <div className="canvas-crumb">{breadcrumb.length
