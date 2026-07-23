@@ -722,3 +722,20 @@ button.library-search:hover { border-color: #c4d0da; color: #566573; }
 :root[data-theme="dark"] .doc-find-result:hover, :root[data-theme="dark"] .doc-find-result.active { background: #1c2634; }
 :root[data-theme="dark"] .doc-find-copy strong { color: #e7edf4; }
 :root[data-theme="dark"] button.library-search:hover { border-color: #3a4759; color: #b3c0cd; }
+
+/* Multi-select marquee + arrange toolbar (issue #10) */
+.marquee { position: absolute; z-index: 15; border: 1px solid #2f6df6; background: rgba(47,109,246,.1); pointer-events: none; border-radius: 2px; }
+.selection-actions { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 16; display: flex; align-items: center; gap: 3px; padding: 5px 7px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(34,54,74,.16); }
+.selection-count { font-size: 11px; font-weight: 700; color: #526579; padding: 0 5px; white-space: nowrap; }
+.selection-actions-sep { width: 1px; height: 18px; background: #e0e6eb; margin: 0 2px; }
+.selection-action { width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: #56687b; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+.selection-action:hover:not(:disabled) { background: #eef3fb; color: #1f5bd7; }
+.selection-action:disabled { opacity: .35; cursor: default; }
+.selection-action.danger:hover:not(:disabled) { background: #fdecee; color: #c74550; }
+:root[data-theme="dark"] .marquee { border-color: #4d82ff; background: rgba(77,130,255,.14); }
+:root[data-theme="dark"] .selection-actions { background: #141c28; border-color: #2a3543; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .selection-count { color: #a4b3c2; }
+:root[data-theme="dark"] .selection-actions-sep { background: #2a3543; }
+:root[data-theme="dark"] .selection-action { color: #a4b3c2; }
+:root[data-theme="dark"] .selection-action:hover:not(:disabled) { background: #1c2740; color: #7aa6ff; }
+:root[data-theme="dark"] .selection-action.danger:hover:not(:disabled) { background: #3a1f24; color: #ff8a94; }

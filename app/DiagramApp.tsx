@@ -4,6 +4,10 @@ import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
 import { ObjectLibraryView } from "./components/ObjectLibraryView";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { SelectionActions } from "./components/SelectionActions";
+import { useSelectionSet } from "./hooks/useSelectionSet";
+import { useMarquee } from "./hooks/useMarquee";
+import type { ArrangeMove } from "./model/arrange";
 import { ConnectionLayer } from "./components/canvas/ConnectionLayer";
 import { ContainerLayer } from "./components/canvas/ContainerLayer";
 import { SystemNodeLayer } from "./components/canvas/SystemNodeLayer"; import { Minimap } from "./components/Minimap"; import { DocumentSearch } from "./components/DocumentSearch";
@@ -97,8 +101,11 @@ export default function DiagramApp() {
     dispatch({ type: "process.update", id: processId, patch }, coalesceKey);
   }, [dispatch]);
   const showToast = (message: string) => setToast(message);
-  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, showToast });
-  const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ zoom, setSelection, updateContainer });
+  const moveObjects = useCallback((moves: ArrangeMove[], coalesceKey?: string) => dispatch({ type: "objects.arrange", moves }, coalesceKey), [dispatch]);
+  const selectionSet = useSelectionSet({ project, selection, setSelection, dispatch, showToast });
+  const { marquee, beginMarquee } = useMarquee({ canvasRef, toCanvasPoint, project, replaceRefs: selectionSet.replaceRefs });
+  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, selectAtPointer: selectionSet.selectAtPointer, moveObjects, showToast });
+  const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ project, zoom, selectAtPointer: selectionSet.selectAtPointer, moveObjects, updateContainer });
   const addContainer = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const center = rect ? toCanvasPoint({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, rect) : { x: 480, y: 360 };
@@ -186,12 +193,7 @@ export default function DiagramApp() {
     setPortDraft((current) => ({ ...current, name: "", secondaryIdentifier: "" }));
     showToast(`${port.capability} ${port.subtype} port added.`);
   };
-  const removeSelected = () => {
-    if (!selection) return;
-    dispatch({ type: "selection.delete", selection });
-    setSelection(null);
-    showToast("Removed from the project.");
-  };
+  const removeSelected = selectionSet.removeSelected; // handles single + multi selection (#10)
   const duplicateNode = (node: SystemNode) => {
     const duplicate: SystemNode = {
       ...node,
@@ -363,7 +365,11 @@ export default function DiagramApp() {
               onPointerMove={handleConnectionPointerMove}
               onPointerLeave={clearPreview}
               onClickCapture={(event) => { if (connectionPointerHandledRef.current) { event.preventDefault(); event.stopPropagation(); connectionPointerHandledRef.current = false; } }}
-              onPointerDown={beginPan}
+              onPointerDown={(event) => {
+                const emptyTarget = event.target === event.currentTarget || (event.target as HTMLElement).classList.contains("diagram-surface");
+                if (!panning && !connectionMode && !containerEditing && event.button === 0 && emptyTarget) { setSelection(null); beginMarquee(event); }
+                else beginPan(event);
+              }}
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleCanvasDrop} style={gridBackgroundStyle(pan, zoom)}>
 
@@ -377,7 +383,7 @@ export default function DiagramApp() {
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
                 }}>
 
-                <ContainerLayer containers={project.containers} selection={selection} editing={containerEditing} viewportBounds={viewportBounds} onSelect={(containerId) => setSelection({ type: "container", id: containerId })} onBeginDrag={beginContainerDrag} onBeginResize={beginContainerResize} />
+                <ContainerLayer containers={project.containers} selection={selection} editing={containerEditing} viewportBounds={viewportBounds} isSelected={selectionSet.isSelected} onBeginDrag={beginContainerDrag} onBeginResize={beginContainerResize} />
                 <ConnectionLayer
                   project={project}
                   selection={selection}
@@ -408,6 +414,7 @@ export default function DiagramApp() {
                   connecting={connecting}
                   activeRoute={activeRoute}
                   activeProcess={activeProcess}
+                  isSelected={selectionSet.isSelected}
                   viewportBounds={viewportBounds}
                   onBeginNodeDrag={beginNodeDrag}
                   onBeginResize={beginResize}
@@ -418,6 +425,8 @@ export default function DiagramApp() {
 
               </div>
 
+              {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.width, height: marquee.height }} />}
+              <SelectionActions count={selectionSet.count} onAlign={selectionSet.align} onDistribute={selectionSet.distribute} onDuplicate={selectionSet.duplicate} onDelete={selectionSet.removeSelected} />
               <Minimap nodes={project.nodes} containers={project.containers} canvas={project.canvas} pan={pan} zoom={zoom} viewportRef={canvasRef} panTo={panTo} />
               <div className="canvas-hint">{containerEditing ? "Container mode · Drag or resize locations · " : "Scroll to pan · Ctrl+scroll to zoom at cursor · "}{project.canvas.mode === "infinite" ? "Infinite canvas" : `${project.canvas.width} × ${project.canvas.height}`} · Snap {GRID}px</div>
             </div>

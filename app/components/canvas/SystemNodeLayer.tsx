@@ -12,6 +12,7 @@ type SystemNodeLayerProps = {
   activeRoute: string[];
   activeProcess?: DataFlowProcess;
   viewportBounds: Bounds;
+  isSelected: (type: "node" | "container", id: string) => boolean;
   onBeginNodeDrag: (event: ReactPointerEvent, node: SystemNode) => void;
   onBeginResize: (event: ReactPointerEvent, node: SystemNode) => void;
   onPortClick: (node: SystemNode, port: Port) => void;
@@ -19,11 +20,11 @@ type SystemNodeLayerProps = {
   onBeginPortResize: (event: ReactPointerEvent<HTMLElement>, node: SystemNode, port: Port) => void;
 };
 
-export function SystemNodeLayer({ project, selection, connectionMode, connecting, activeRoute, activeProcess, viewportBounds, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
+export function SystemNodeLayer({ project, selection, connectionMode, connecting, activeRoute, activeProcess, viewportBounds, isSelected, onBeginNodeDrag, onBeginResize, onPortClick, onBeginPortDrag, onBeginPortResize }: SystemNodeLayerProps) {
   return (
     <>
       {[...project.nodes].sort((a, b) => (a.kind === "nestable" ? -1 : 0) - (b.kind === "nestable" ? -1 : 0)).map((node) => {
-        const selected = selection?.type === "node" && selection.id === node.id;
+        const selected = isSelected("node", node.id) || (selection?.type === "node" && selection.id === node.id);
         const inActiveProcess = Boolean(activeProcess?.checkpoints.includes(node.id) || activeRoute.some((edgeId) => {
           const edge = getProjectObject(project, "connection", edgeId);
           return edge?.sourceNodeId === node.id || edge?.targetNodeId === node.id;
