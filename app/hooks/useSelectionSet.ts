@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProjectCommand } from "../model/commands";
 import { alignMoves, distributeMoves, movablesFromRefs, type AlignEdge, type DistributeAxis } from "../model/arrange";
-import { cloneMovables } from "../model/clipboard";
+import { cloneMovables, cloneMovablePayload, collectMovables, type MovablePayload } from "../model/clipboard";
+import { GRID } from "../model/project";
 import type { Project, Selection, SelectionRef } from "../model/types";
 
 type Options = {
@@ -97,23 +98,64 @@ export function useSelectionSet({ project, selection, setSelection, dispatch, sh
     ]);
   }, [project, replaceRefs]);
 
+  // In-app clipboard (copy/cut/paste, #10). Holds a value snapshot so a cut can still be pasted, and
+  // cascades repeated pastes so they don't stack exactly on top of each other.
+  const clipboard = useRef<MovablePayload | null>(null);
+  const pasteRun = useRef(0);
+
+  const copy = useCallback(() => {
+    if (!selectedRefs.length) return false;
+    clipboard.current = collectMovables(project, selectedRefs);
+    pasteRun.current = 0;
+    return clipboard.current.nodes.length + clipboard.current.containers.length > 0;
+  }, [project, selectedRefs]);
+
+  const cut = useCallback(() => {
+    if (copy()) { removeSelected(); showToast("Cut to clipboard."); }
+  }, [copy, removeSelected, showToast]);
+
+  const paste = useCallback(() => {
+    const payload = clipboard.current;
+    if (!payload || (!payload.nodes.length && !payload.containers.length)) return;
+    pasteRun.current += 1;
+    const shift = GRID * 2 * pasteRun.current;
+    const clone = cloneMovablePayload(payload, { x: shift, y: shift });
+    dispatch({ type: "objects.add", nodes: clone.nodes, containers: clone.containers });
+    setSelectedRefs(clone.refs);
+    setSelection(clone.refs[clone.refs.length - 1] ?? null);
+    showToast(`Pasted ${clone.refs.length} object${clone.refs.length === 1 ? "" : "s"}.`);
+  }, [dispatch, setSelection, showToast]);
+
+  // Arrow-key nudge: one grid cell (fine) or five (coarse, with Shift). Coalesced into one undo step.
+  const nudge = useCallback((dx: number, dy: number) => {
+    if (!selectedRefs.length) return;
+    const moves = movablesFromRefs(project, selectedRefs).map((box) => ({ type: box.ref.type, id: box.ref.id, x: box.x + dx, y: box.y + dy }));
+    if (moves.length) dispatch({ type: "objects.arrange", moves }, "nudge");
+  }, [project, selectedRefs, dispatch]);
+
   // Editing shortcuts — ignored while a form field is focused.
   useEffect(() => {
     const isTyping = () => {
       const element = document.activeElement as HTMLElement | null;
       return !!element && (element.tagName === "INPUT" || element.tagName === "TEXTAREA" || element.tagName === "SELECT" || element.isContentEditable);
     };
+    const NUDGE: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping()) return;
       const mod = event.ctrlKey || event.metaKey;
+      const nudgeDir = NUDGE[event.key];
       if ((event.key === "Delete" || event.key === "Backspace") && (selectedRefs.length || selection)) { event.preventDefault(); removeSelected(); }
       else if (mod && event.key.toLowerCase() === "d") { event.preventDefault(); duplicate(); }
       else if (mod && event.key.toLowerCase() === "a") { event.preventDefault(); selectAll(); }
+      else if (mod && event.key.toLowerCase() === "c") { copy(); }
+      else if (mod && event.key.toLowerCase() === "x") { event.preventDefault(); cut(); }
+      else if (mod && event.key.toLowerCase() === "v") { event.preventDefault(); paste(); }
+      else if (nudgeDir && selectedRefs.length) { event.preventDefault(); const step = GRID * (event.shiftKey ? 5 : 1); nudge(nudgeDir[0] * step, nudgeDir[1] * step); }
       else if (event.key === "Escape" && selectedRefs.length) { setSelectedRefs([]); setSelection(null); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedRefs, selection, removeSelected, duplicate, selectAll, setSelection]);
+  }, [selectedRefs, selection, removeSelected, duplicate, selectAll, copy, cut, paste, nudge, setSelection]);
 
-  return { selectedRefs, count: selectedRefs.length, isSelected, selectAtPointer, replaceRefs, align, distribute, duplicate, removeSelected };
+  return { selectedRefs, count: selectedRefs.length, isSelected, selectAtPointer, replaceRefs, align, distribute, duplicate, removeSelected, copy, cut, paste, nudge };
 }
