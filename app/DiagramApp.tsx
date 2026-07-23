@@ -4,6 +4,8 @@ import { CanvasToolbar } from "./components/CanvasToolbar";
 import { PropertiesInspector } from "./components/PropertiesInspector"; import { Switch } from "./components/ui/Switch";
 import { ObjectLibraryView } from "./components/ObjectLibraryView";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { useGroupResize } from "./hooks/useGroupResize";
+import type { Guide } from "./model/guides";
 import { SelectionActions } from "./components/SelectionActions";
 import { useSelectionSet } from "./hooks/useSelectionSet";
 import { useMarquee } from "./hooks/useMarquee";
@@ -102,10 +104,12 @@ export default function DiagramApp() {
   }, [dispatch]);
   const showToast = (message: string) => setToast(message);
   const moveObjects = useCallback((moves: ArrangeMove[], coalesceKey?: string) => dispatch({ type: "objects.arrange", moves }, coalesceKey), [dispatch]);
+  const [guides, setGuides] = useState<Guide[]>([]);
   const selectionSet = useSelectionSet({ project, selection, setSelection, dispatch, showToast });
   const { marquee, beginMarquee } = useMarquee({ canvasRef, toCanvasPoint, project, replaceRefs: selectionSet.replaceRefs });
-  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, selectAtPointer: selectionSet.selectAtPointer, moveObjects, showToast });
-  const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ project, zoom, selectAtPointer: selectionSet.selectAtPointer, moveObjects, updateContainer });
+  const groupResize = useGroupResize({ project, selectedRefs: selectionSet.selectedRefs, zoom, moveObjects });
+  const { saveRoute, addBendPoint, beginBendDrag, beginSegmentDrag, beginNodeDrag, beginResize, beginPortDrag, beginPortResize } = useDiagramInteractions({ project, zoom, setSelection, updateNode, updateConnection, selectAtPointer: selectionSet.selectAtPointer, moveObjects, onGuides: setGuides, showToast });
+  const { beginContainerDrag, beginContainerResize } = useContainerInteractions({ project, zoom, selectAtPointer: selectionSet.selectAtPointer, moveObjects, onGuides: setGuides, updateContainer });
   const addContainer = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const center = rect ? toCanvasPoint({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, rect) : { x: 480, y: 360 };
@@ -315,6 +319,8 @@ export default function DiagramApp() {
               canRedo={canRedo}
               canFitSelection={Boolean(selectionBounds)}
               breadcrumb={selectionBreadcrumb(project, selection)}
+              snapToGrid={project.canvas.snapToGrid !== false}
+              onToggleSnap={() => dispatch({ type: "canvas.update", patch: { snapToGrid: project.canvas.snapToGrid === false } })}
               onFind={nav.openSearch}
               onSelect={() => {
                 setConnectionMode(false);
@@ -422,7 +428,14 @@ export default function DiagramApp() {
                   onBeginPortDrag={beginPortDrag}
                   onBeginPortResize={beginPortResize}
                 />
-
+                {guides.map((guide, index) => (
+                  <div key={index} className={`smart-guide ${guide.axis}`} style={guide.axis === "x" ? { left: guide.position, top: guide.from, height: guide.to - guide.from } : { top: guide.position, left: guide.from, width: guide.to - guide.from }} />
+                ))}
+                {selectionSet.count >= 2 && groupResize.bounds && (
+                  <div className="group-selection" style={{ left: groupResize.bounds.x, top: groupResize.bounds.y, width: groupResize.bounds.width, height: groupResize.bounds.height }}>
+                    <span className="group-resize-handle" onPointerDown={groupResize.beginResize} aria-label="Resize selection" />
+                  </div>
+                )}
               </div>
 
               {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.width, height: marquee.height }} />}

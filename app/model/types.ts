@@ -164,6 +164,8 @@ export type CanvasSettings = {
   mode: "bounded" | "infinite";
   width: number;
   height: number;
+  // Grid snapping toggle (#10 phase 3). Optional for back-compat; treated as enabled when undefined.
+  snapToGrid?: boolean;
 };
 
 export type Bounds = {

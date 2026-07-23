@@ -48,6 +48,26 @@ export function alignMoves(boxes: Box[], edge: AlignEdge): ArrangeMove[] {
   });
 }
 
+const MIN_SIZE = { node: { width: 192, height: 160 }, container: { width: 240, height: 160 } };
+
+// Scale the whole selection about its top-left corner (group resize, #10 phase 3). The scale is
+// clamped so no object drops below its minimum size, which keeps the layout proportional.
+export function resizeMoves(boxes: Box[], bounds: Bounds, rawScaleX: number, rawScaleY: number): ArrangeMove[] {
+  if (boxes.length < 1 || !bounds.width || !bounds.height) return [];
+  const minScaleX = Math.max(...boxes.map((b) => MIN_SIZE[b.ref.type].width / b.width));
+  const minScaleY = Math.max(...boxes.map((b) => MIN_SIZE[b.ref.type].height / b.height));
+  const scaleX = Math.max(rawScaleX, minScaleX);
+  const scaleY = Math.max(rawScaleY, minScaleY);
+  return boxes.map((box) => ({
+    type: box.ref.type,
+    id: box.ref.id,
+    x: Math.round(bounds.x + (box.x - bounds.x) * scaleX),
+    y: Math.round(bounds.y + (box.y - bounds.y) * scaleY),
+    width: Math.round(box.width * scaleX),
+    height: Math.round(box.height * scaleY),
+  }));
+}
+
 // Even edge-to-edge gaps between the boxes along one axis; the two extreme boxes stay put.
 export function distributeMoves(boxes: Box[], axis: DistributeAxis): ArrangeMove[] {
   if (boxes.length < 3) return [];
