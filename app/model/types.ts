@@ -196,6 +196,9 @@ export type Selection =
   | { type: "process"; id: string }
   | null;
 
+// A movable object that can participate in multi-selection, group move, align, and distribute (#10).
+export type SelectionRef = { type: "node" | "container"; id: string };
+
 export type PortDraft = {
   direction: Direction;
   capability: Capability;

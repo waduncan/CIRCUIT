@@ -1,7 +1,7 @@
 import { containerForNode, reconcileNodeContainers } from "./containers";
 import { reconcileNestedNodes } from "./nesting";
 import { getProjectObject } from "./projectObject";
-import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Point, Project, Selection, SystemNode } from "./types";
+import type { CanvasSettings, Connection, DataFlowProcess, DiagramContainer, LibraryItem, Point, Project, Selection, SelectionRef, SystemNode } from "./types";
 
 export type ProjectCommand =
   | { type: "node.add"; node: SystemNode }
@@ -18,7 +18,11 @@ export type ProjectCommand =
   | { type: "library.replace"; items: LibraryItem[] }
   | { type: "canvas.update"; patch: Partial<CanvasSettings> }
   | { type: "presentation.update"; presentation: Project["presentation"] }
-  | { type: "selection.delete"; selection: Exclude<Selection, null> };
+  | { type: "selection.delete"; selection: Exclude<Selection, null> }
+  // Multi-object operations (#10) — each applied as one command so it is a single undo step.
+  | { type: "objects.arrange"; moves: Array<{ type: "node" | "container"; id: string; x: number; y: number }> }
+  | { type: "objects.delete"; refs: SelectionRef[] }
+  | { type: "objects.add"; nodes: SystemNode[]; containers: DiagramContainer[] };
 
 export function applyProjectCommand(project: Project, command: ProjectCommand): Project {
   switch (command.type) {
@@ -80,5 +84,45 @@ export function applyProjectCommand(project: Project, command: ProjectCommand): 
       }
       if (command.selection.type === "connection") return { ...project, connections: project.connections.filter((edge) => edge.id !== command.selection.id) };
       return { ...project, processes: project.processes.filter((process) => process.id !== command.selection.id) };
+    case "objects.arrange": {
+      const key = (type: string, id: string) => `${type}:${id}`;
+      const targets = new Map(command.moves.map((move) => [key(move.type, move.id), move]));
+      // Move each listed node to its target, recording the delta of nestable parents so their
+      // contained children follow (unless a child was itself explicitly moved).
+      const parentDelta = new Map<string, Point>();
+      const moved = project.nodes.map((node) => {
+        const target = targets.get(key("node", node.id));
+        if (!target) return node;
+        if (node.kind === "nestable") parentDelta.set(node.id, { x: target.x - node.x, y: target.y - node.y });
+        return { ...node, x: target.x, y: target.y };
+      });
+      const withChildren = moved.map((node) => {
+        if (node.nestedParentId && !targets.has(key("node", node.id))) {
+          const delta = parentDelta.get(node.nestedParentId);
+          if (delta) return { ...node, x: node.x + delta.x, y: node.y + delta.y };
+        }
+        return node;
+      });
+      const containers = project.containers.map((container) => {
+        const target = targets.get(key("container", container.id));
+        return target ? { ...container, x: target.x, y: target.y } : container;
+      });
+      return { ...project, containers, nodes: reconcileNodeContainers(reconcileNestedNodes(withChildren), containers) };
+    }
+    case "objects.delete": {
+      const nodeIds = new Set(command.refs.filter((ref) => ref.type === "node").map((ref) => ref.id));
+      const containerIds = new Set(command.refs.filter((ref) => ref.type === "container").map((ref) => ref.id));
+      return {
+        ...project,
+        containers: project.containers.filter((container) => !containerIds.has(container.id)),
+        nodes: project.nodes.filter((node) => !nodeIds.has(node.id)).map((node) => node.containerId && containerIds.has(node.containerId) ? { ...node, containerId: undefined } : node),
+        connections: project.connections.filter((edge) => !nodeIds.has(edge.sourceNodeId) && !nodeIds.has(edge.targetNodeId)),
+        processes: project.processes.map((process) => ({ ...process, checkpoints: process.checkpoints.filter((nodeId) => !nodeIds.has(nodeId)) })),
+      };
+    }
+    case "objects.add": {
+      const containers = [...project.containers, ...command.containers];
+      return { ...project, containers, nodes: reconcileNodeContainers(reconcileNestedNodes([...project.nodes, ...command.nodes]), containers) };
+    }
   }
 }

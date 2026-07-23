@@ -8,23 +8,23 @@ type ContainerLayerProps = {
   selection: Selection;
   editing: boolean;
   viewportBounds: Bounds;
-  onSelect: (containerId: string) => void;
+  isSelected: (type: "node" | "container", id: string) => boolean;
   onBeginDrag: (event: ReactPointerEvent<HTMLElement>, container: DiagramContainer) => void;
   onBeginResize: (event: ReactPointerEvent<HTMLButtonElement>, container: DiagramContainer) => void;
 };
 
-export function ContainerLayer({ containers, selection, editing, viewportBounds, onSelect, onBeginDrag, onBeginResize }: ContainerLayerProps) {
+export function ContainerLayer({ containers, selection, editing, viewportBounds, isSelected, onBeginDrag, onBeginResize }: ContainerLayerProps) {
   return (
     <section className={`container-layer ${editing ? "editing" : ""}`} aria-label="Diagram containers">
       {containers.map((container) => {
-        const selected = selection?.type === "container" && selection.id === container.id;
+        const selected = isSelected("container", container.id) || (selection?.type === "container" && selection.id === container.id);
         if (!selected && !intersectsBounds(containerBounds(container), viewportBounds)) return null;
         return (
           <article
             className={`diagram-container ${selected ? "selected" : ""}`}
             key={container.id}
             style={{ left: container.x, top: container.y, width: container.width, height: container.height, "--container-color": container.color, "--container-opacity": container.opacity } as CSSProperties}
-            onPointerDown={(event) => { if (!editing) return; onSelect(container.id); onBeginDrag(event, container); }}
+            onPointerDown={(event) => { if (!editing) return; onBeginDrag(event, container); }}
           >
             <div className="container-title"><span>{container.kind}</span><strong>{container.name}</strong></div>
             {editing && selected && <button className="container-resize" aria-label={`Resize ${container.name}`} onPointerDown={(event) => onBeginResize(event, container)} />}
